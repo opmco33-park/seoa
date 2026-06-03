@@ -18,6 +18,7 @@ on:
           - retag       # 일회성: 기존 전체에 주제 꼬리표 달기
           - backfill    # 일회성: 과거 전체 분석
           - resources   # 국내 실용자료만 (재)수집
+          - resynth     # 종합분석만 전체 데이터로 강제 재생성
 
 permissions:
   contents: write
@@ -48,6 +49,8 @@ jobs:
             python sotos_research_agent.py --backfill
           elif [ "$MODE" = "resources" ]; then
             python sotos_research_agent.py --resources
+          elif [ "$MODE" = "resynth" ]; then
+            python sotos_research_agent.py --resynth
           else
             python sotos_research_agent.py
           fi

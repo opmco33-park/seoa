@@ -534,7 +534,7 @@ SYNTH_REDUCE_SYSTEM = """당신은 의학 연구 동향을 '의학을 전혀 모
 여러 묶음 메모를 종합해 전체 그림을 '아주 쉬운 한국어'로 정리하세요. 중학생도 이해할 수준으로 씁니다.
 규칙:
 - 전문용어·영어 약자·유전자명 등은 본문에서 쓰지 말거나, 쓰면 바로 괄호로 쉬운 설명을 답니다.
-- 본문에서 한 번이라도 쓴 어려운 용어는 빠짐없이 glossary에 쉬운 풀이를 넣습니다(최소 3개 이상 권장).
+- 본문에서 한 번이라도 쓴 어려운 용어는 빠짐없이 glossary에 쉬운 풀이를 넣습니다(최소 3개 이상). 예: NSD1, 히스톤 메틸화효소, 표현형, 대립유전자 등 보호자가 모를 만한 용어는 반드시 포함.
 - 진단·치료·복용 권고 금지. 과장 금지. '이미 잘 알려진 것'과 '아직 연구 중인 것'을 쉬운 말로 구분.
 아래 JSON '하나만' 출력(코드펜스 금지):
 {
@@ -642,9 +642,9 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime,
         q = "".join(f"<li>{esc(x)}</li>" for x in synth.get("questions_for_doctor", []))
         glossary = synth.get("glossary", []) or []
         gl_items = "".join(
-            f'<div class="gl"><b>{esc(g.get("term"))}</b> — {esc(g.get("explain"))}</div>'
+            f'<li><b>{esc(g.get("term"))}</b> — {esc(g.get("explain"))}</li>'
             for g in glossary if g.get("term"))
-        gl_html = (f'<div class="glossary"><div class="callout-title">쉽게 풀어 본 용어</div>{gl_items}</div>'
+        gl_html = (f'<div class="footnotes"><div class="footnotes-title">용어 풀이 (각주)</div><ol>{gl_items}</ol></div>'
                    if gl_items else "")
         synth_html = f"""
         <section class="synthesis">
@@ -652,8 +652,8 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime,
           <p class="synth-overview">{esc(synth.get('overview'))}</p>
           <div class="themes">{themes}</div>
           <p class="synth-recent"><b>최근 동향.</b> {esc(synth.get('recent_developments'))}</p>
-          {gl_html}
           <div class="callout"><div class="callout-title">의료진과 논의하면 좋은 질문</div><ul>{q}</ul></div>
+          {gl_html}
         </section>"""
     else:
         synth_html = '<section class="synthesis"><p class="muted">종합 분석은 자료가 모이면 자동으로 생성됩니다.</p></section>'
@@ -708,6 +708,11 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime,
     .glossary{background:var(--soft);border-radius:12px;padding:14px 16px;margin:14px 0}
     .glossary .gl{font-size:.88rem;margin:5px 0;color:var(--ink)}
     .glossary .gl b{color:var(--accent)}
+    .footnotes{margin-top:22px;padding-top:14px;border-top:1px dashed var(--line)}
+    .footnotes-title{font-size:.8rem;font-weight:700;color:var(--muted);letter-spacing:.02em;margin-bottom:6px}
+    .footnotes ol{margin:0;padding-left:20px}
+    .footnotes li{font-size:.84rem;color:var(--muted);line-height:1.6;margin:4px 0}
+    .footnotes li b{color:var(--ink)}
     .cal-rep-lbl{align-self:center;font-size:.82rem;color:var(--muted)}
     .chat-fab{position:fixed;right:20px;bottom:20px;z-index:1000;width:56px;height:56px;border-radius:50%;border:none;background:var(--accent);color:#fff;font-size:1.5rem;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.28)}
     .chat-fab:hover{filter:brightness(1.08)}
@@ -746,6 +751,8 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime,
     .cal-cell{min-height:84px;border:1px solid var(--line);border-radius:8px;padding:5px;background:#fff;overflow:hidden}
     .cal-empty{background:transparent;border:none}
     .cal-today{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+    .cal-sel{background:var(--soft);border-color:var(--accent);box-shadow:0 0 0 2px var(--accent) inset}
+    .cal-cell{cursor:pointer}
     .cal-d{font-size:.78rem;color:var(--muted);margin-bottom:3px}
     .cal-ev{display:flex;justify-content:space-between;align-items:center;gap:3px;color:#fff;font-size:.72rem;border-radius:5px;padding:2px 5px;margin-bottom:3px;line-height:1.25}
     .cal-ev span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -931,7 +938,7 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime,
     }
     // ----- 공유 캘린더 (Firebase) -----
     const CATCOLOR={'인지':'#5b8def','운동':'#2bb673','자조':'#e8923b','한글':'#9b6fd6','수영':'#16b1c4','수영(학교)':'#0e7c8a','병원':'#e05c5c','기타':'#8a8f99'};
-    let fbReady=false, fbAuth=null, fbDB=null, calUser=null, calEvents={}, calCursor=new Date(), calView='week', editId=null;
+    let fbReady=false, fbAuth=null, fbDB=null, calUser=null, calEvents={}, calCursor=new Date(), calView='week', editId=null, selectedDate=null;
     const authListeners=[];
     function calEl(id){return document.getElementById(id);}
     function ensureFirebase(){
@@ -960,7 +967,7 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime,
       calEl('cal-login-btn').onclick=()=>fbLogin('cal-email','cal-pw','cal-err');
       calEl('cal-pw').addEventListener('keydown',e=>{if(e.key==='Enter')calEl('cal-login-btn').click();});
       calEl('cal-logout').onclick=()=>fbAuth.signOut();
-      function stepCal(dir){ if(calView==='week') calCursor.setDate(calCursor.getDate()+7*dir); else calCursor.setMonth(calCursor.getMonth()+dir); renderCal(); }
+      function stepCal(dir){ selectedDate=null; if(calView==='week') calCursor.setDate(calCursor.getDate()+7*dir); else calCursor.setMonth(calCursor.getMonth()+dir); renderCal(); }
       calEl('cal-prev').onclick=()=>stepCal(-1);
       calEl('cal-next').onclick=()=>stepCal(1);
       calEl('cal-view-week').onclick=()=>setCalView('week');
@@ -976,7 +983,7 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime,
         err=>{calEl('cal-app').insertAdjacentHTML('afterbegin','<p class="muted">읽기 권한 오류(보안 규칙 확인): '+esc(err.message)+'</p>');});
     }
     function setCalView(v){
-      calView=v;
+      calView=v; selectedDate=null;
       calEl('cal-view-week').classList.toggle('active', v==='week');
       calEl('cal-view-month').classList.toggle('active', v==='month');
       renderCal();
@@ -1037,49 +1044,62 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime,
         `</div><div class="ev-btns"><button class="ag-edit" onclick="__editEvent('${e.id}')">수정</button>`+
         `<button class="ag-del" onclick="__delEvent('${e.id}')">삭제</button></div></div>`;
     }
+    function eventsOn(ds){ return Object.keys(calEvents).map(id=>({id,...calEvents[id]})).filter(e=>e.date===ds).sort((a,b)=>(a.time||'').localeCompare(b.time||'')); }
+    window.__selDay=function(ds){ selectedDate=(selectedDate===ds?null:ds); renderCal(); };
+    window.__clearSel=function(){ selectedDate=null; renderCal(); };
     function renderCal(){
       calEl('cal-legend').innerHTML=CATS.map(c=>`<span class="cal-lg"><i style="background:${CATCOLOR[c]||'#8a8f99'}"></i>${esc(c)}</span>`).join('');
-      if(calView==='week') renderWeek(); else renderMonth();
+      renderGrid();
+      renderList();
     }
-    function renderWeek(){
-      calEl('cal-grid').style.display='none'; calEl('cal-agenda').style.display='none'; calEl('cal-agenda-h').style.display='none';
-      const wk=calEl('cal-week'); wk.style.display='block';
-      const start=new Date(calCursor); start.setDate(start.getDate()-start.getDay());
-      const end=new Date(start); end.setDate(end.getDate()+6);
-      calEl('cal-label').textContent=`${start.getMonth()+1}/${start.getDate()} – ${end.getMonth()+1}/${end.getDate()}`;
-      const today=ymd(new Date());
-      let html='';
-      for(let i=0;i<7;i++){
-        const d=new Date(start); d.setDate(start.getDate()+i); const ds=ymd(d);
-        const evs=Object.keys(calEvents).map(id=>({id,...calEvents[id]})).filter(e=>e.date===ds).sort((a,b)=>(a.time||'').localeCompare(b.time||''));
-        const rows=evs.length? evs.map(e=>eventRow(e,false)).join('') : '<div class="wk-empty">일정 없음</div>';
-        html+=`<div class="wk-day${ds===today?' wk-today':''}"><div class="wk-dhead">${d.getMonth()+1}/${d.getDate()} (${DOW[d.getDay()]})</div>${rows}</div>`;
-      }
-      wk.innerHTML=html;
-    }
-    function renderMonth(){
-      calEl('cal-week').style.display='none'; calEl('cal-grid').style.display='grid';
-      calEl('cal-agenda').style.display='block'; calEl('cal-agenda-h').style.display='block';
+    function renderGrid(){
       const y=calCursor.getFullYear(), m=calCursor.getMonth();
       calEl('cal-label').textContent=`${y}년 ${m+1}월`;
       const byDate={};
-      Object.keys(calEvents).forEach(id=>{const e=calEvents[id]; (byDate[e.date]=byDate[e.date]||[]).push({id,...e});});
+      Object.keys(calEvents).forEach(id=>{const e=calEvents[id]; (byDate[e.date]=byDate[e.date]||[]).push(e);});
       const first=new Date(y,m,1), startDow=first.getDay(), days=new Date(y,m+1,0).getDate(), today=ymd(new Date());
       let cells='';
       for(let i=0;i<startDow;i++) cells+='<div class="cal-cell cal-empty"></div>';
       for(let d=1;d<=days;d++){
         const ds=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
         const evs=(byDate[ds]||[]).sort((a,b)=>(a.time||'').localeCompare(b.time||''));
-        const chips=evs.map(e=>`<div class="cal-ev" style="background:${CATCOLOR[e.cat]||'#8a8f99'}" onclick="__editEvent('${e.id}')" title="${esc(e.title)} ${esc(e.memo||'')} (${esc(e.by||'')})">`+
-          `<span>${e.series?'⟲ ':''}${e.time?esc(e.time)+' ':''}${esc(e.title)}</span></div>`).join('');
-        cells+=`<div class="cal-cell${ds===today?' cal-today':''}"><div class="cal-d">${d}</div>${chips}</div>`;
+        const chips=evs.map(e=>`<div class="cal-ev" style="background:${CATCOLOR[e.cat]||'#8a8f99'}"><span>${e.series?'⟲ ':''}${e.time?esc(e.time)+' ':''}${esc(e.title)}</span></div>`).join('');
+        const sel=ds===selectedDate?' cal-sel':'';
+        cells+=`<div class="cal-cell${ds===today?' cal-today':''}${sel}" onclick="__selDay('${ds}')"><div class="cal-d">${d}</div>${chips}</div>`;
       }
       calEl('cal-grid').innerHTML='<div class="cal-dow">일</div><div class="cal-dow">월</div><div class="cal-dow">화</div><div class="cal-dow">수</div><div class="cal-dow">목</div><div class="cal-dow">금</div><div class="cal-dow">토</div>'+cells;
-      const ym=`${y}-${String(m+1).padStart(2,'0')}`;
-      const monthEvs=Object.keys(calEvents).map(id=>({id,...calEvents[id]}))
-        .filter(e=>String(e.date||'').slice(0,7)===ym)
-        .sort((a,b)=>(a.date+'T'+(a.time||'')).localeCompare(b.date+'T'+(b.time||'')));
-      calEl('cal-agenda').innerHTML = monthEvs.length ? monthEvs.map(e=>eventRow(e,true)).join('') : '<p class="muted">이 달 일정이 없습니다.</p>';
+    }
+    function renderList(){
+      const h=calEl('cal-list-h'), L=calEl('cal-list');
+      if(selectedDate){
+        const d=new Date(selectedDate+'T00:00:00');
+        h.innerHTML=`${d.getMonth()+1}/${d.getDate()}(${DOW[d.getDay()]}) 일정 <button class="cal-link" onclick="__clearSel()">× 전체 보기</button>`;
+        const evs=eventsOn(selectedDate);
+        L.innerHTML=evs.length? evs.map(e=>eventRow(e,false)).join('') : '<p class="muted">이 날 일정이 없습니다.</p>';
+        return;
+      }
+      if(calView==='week'){
+        const start=new Date(calCursor); start.setDate(start.getDate()-start.getDay());
+        const end=new Date(start); end.setDate(end.getDate()+6);
+        h.textContent=`이번 주 (${start.getMonth()+1}/${start.getDate()} – ${end.getMonth()+1}/${end.getDate()})`;
+        const today=ymd(new Date());
+        let html='';
+        for(let i=0;i<7;i++){
+          const dd=new Date(start); dd.setDate(start.getDate()+i); const ds=ymd(dd);
+          const evs=eventsOn(ds);
+          const rows=evs.length? evs.map(e=>eventRow(e,false)).join('') : '<div class="wk-empty">일정 없음</div>';
+          html+=`<div class="wk-day${ds===today?' wk-today':''}"><div class="wk-dhead">${dd.getMonth()+1}/${dd.getDate()} (${DOW[dd.getDay()]})</div>${rows}</div>`;
+        }
+        L.innerHTML=html;
+      } else {
+        const y=calCursor.getFullYear(), m=calCursor.getMonth();
+        h.textContent='이 달 일정';
+        const ym=`${y}-${String(m+1).padStart(2,'0')}`;
+        const monthEvs=Object.keys(calEvents).map(id=>({id,...calEvents[id]}))
+          .filter(e=>String(e.date||'').slice(0,7)===ym)
+          .sort((a,b)=>(a.date+'T'+(a.time||'')).localeCompare(b.date+'T'+(b.time||'')));
+        L.innerHTML=monthEvs.length? monthEvs.map(e=>eventRow(e,true)).join('') : '<p class="muted">이 달 일정이 없습니다.</p>';
+      }
     }
     // ----- 질문하기 (자료 근거 RAG 챗봇) -----
     const CHAT_MODEL="claude-haiku-4-5-20251001";
@@ -1235,9 +1255,8 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime,
         "<div class='cal-viewtoggle'><button id='cal-view-week' class='vbtn active'>주간</button><button id='cal-view-month' class='vbtn'>월간</button></div>"
         "<div class='cal-nav'><button id='cal-prev' class='cal-link'>‹ 이전</button>"
         "<b id='cal-label'></b><button id='cal-next' class='cal-link'>다음 ›</button></div>"
-        "<div id='cal-week' class='cal-week'></div>"
-        "<div id='cal-grid' class='cal-grid' style='display:none'></div>"
-        "<div id='cal-agenda-h' class='cal-agenda-h' style='display:none'>이 달 일정</div><div id='cal-agenda' class='cal-agenda' style='display:none'></div></div>"
+        "<div id='cal-grid' class='cal-grid'></div>"
+        "<div id='cal-list-h' class='cal-agenda-h'></div><div id='cal-list' class='cal-agenda'></div></div>"
         "</div>"
         # ===== 질문하기 (좌측 하단 플로팅) =====
         "<button id='chat-fab' class='chat-fab' aria-label='질문하기' title='질문하기'>💬</button>"

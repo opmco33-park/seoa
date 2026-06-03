@@ -69,6 +69,19 @@ CONFIG = {
     "site_title": "서아 통합 연구·케어",
     "data_dir": "data",
     "docs_dir": "docs",   # GitHub Pages 발행 폴더 (index.html)
+
+    # --- 국내 실용자료 수집 (robots.txt 준수) ---
+    "crawler_user_agent": "seoa-care-agent",
+    # 신뢰하는 '공식 공개' 페이지/피드만 넣으세요. kind: "page"(정보 페이지) | "rss"(피드)
+    # 아래는 예시이며 자유롭게 교체/추가하세요. (각 URL은 robots.txt 허용 시에만 수집됩니다.)
+    "resource_sources": [
+        {"id": "snuh_sotos", "label": "서울대병원 희귀질환센터", "title": "소토스 증후군 정보",
+         "kind": "page",
+         "url": "https://raredisease.snuh.org/rare-disease-info/congenital-malformation/소토스-증후군/"},
+        {"id": "nrc_child", "label": "국립재활원 재활정보포털", "title": "장애아동 질병과 재활치료",
+         "kind": "page",
+         "url": "https://www.nrc.go.kr/portal/html/content.do?depth=dc&menu_cd=06_02_02"},
+    ],
 }
 
 # 연구 '영역(domain)'별 검색 스트림. 영역을 추가/수정하려면 여기만 고치면 됩니다.
@@ -344,6 +357,156 @@ def ai_classify_batch(batch: list, api_key: str) -> dict:
 
 
 # ==========================================================================
+# 5-2. 국내 실용자료 수집 (robots.txt 준수 · 페이지/RSS)
+# ==========================================================================
+import urllib.robotparser
+from urllib.parse import urlparse
+from html.parser import HTMLParser
+
+RESOURCES_PATH = DATA_DIR / "resources.jsonl"
+
+
+class _TextExtractor(HTMLParser):
+    """HTML에서 본문 텍스트만 추출 (script/style 제외). bs4 등 외부 의존성 없이 stdlib만 사용."""
+    def __init__(self):
+        super().__init__()
+        self.parts, self._skip = [], 0
+
+    def handle_starttag(self, tag, attrs):
+        if tag in ("script", "style", "noscript"):
+            self._skip += 1
+
+    def handle_endtag(self, tag):
+        if tag in ("script", "style", "noscript") and self._skip:
+            self._skip -= 1
+
+    def handle_data(self, data):
+        if not self._skip and data.strip():
+            self.parts.append(data.strip())
+
+
+def robots_allowed(url: str) -> bool:
+    """robots.txt에서 허용되는지 확인. 읽을 수 없으면 표준 해석상 허용으로 간주."""
+    try:
+        p = urlparse(url)
+        rp = urllib.robotparser.RobotFileParser()
+        rp.set_url(f"{p.scheme}://{p.netloc}/robots.txt")
+        rp.read()
+        return rp.can_fetch(CONFIG.get("crawler_user_agent", "*"), url)
+    except Exception:
+        return True
+
+
+def fetch_text(url: str) -> str:
+    headers = {"User-Agent": CONFIG.get("crawler_user_agent", "seoa-care-agent")}
+    r = requests.get(url, headers=headers, timeout=30)
+    r.raise_for_status()
+    ext = _TextExtractor()
+    ext.feed(r.text)
+    return " ".join(" ".join(ext.parts).split())[:6000]
+
+
+RESOURCE_SUMMARY_SYSTEM = """당신은 발달지연 아동(Sotos 증후군)을 돌보는 보호자를 돕는 보조자입니다.
+국내 공식 사이트 글에서 '보호자에게 실용적으로 도움되는 내용'을 한국어로 정리하세요.
+규칙: 진단·치료 권고 금지. 글에 있는 내용만. 메뉴·광고·머리말 등 잡음 제외.
+아래 JSON 하나만 출력(코드펜스 금지):
+{
+  "summary_3lines": "핵심 내용 3문장 이내",
+  "relevance": "발달치료(인지·운동·자조 등)에 어떻게 도움되는지 1~2문장(관련 낮으면 '관련성 낮음')",
+  "tips": ["일상에서 적용해볼 포인트 1~3개(글에 근거)"]
+}"""
+
+
+def ai_summarize_resource(title: str, text: str, api_key: str) -> dict | None:
+    try:
+        return _parse_json_loose(_call_anthropic(
+            api_key, RESOURCE_SUMMARY_SYSTEM, f"제목: {title}\n본문:\n{text}",
+            CONFIG["anthropic_max_tokens"]))
+    except Exception as e:
+        log(f"  ! 자료 요약 실패({e})")
+        return None
+
+
+def _parse_rss(xml_text: str) -> list:
+    out = []
+    try:
+        root = ET.fromstring(xml_text)
+    except Exception:
+        return out
+    for item in root.iter():
+        tag = item.tag.lower().split("}")[-1]
+        if tag in ("item", "entry"):
+            rec = {"title": "", "link": "", "date": ""}
+            for ch in item:
+                t = ch.tag.lower().split("}")[-1]
+                if t == "title":
+                    rec["title"] = (ch.text or "").strip()
+                elif t == "link":
+                    rec["link"] = (ch.text or "").strip() or ch.attrib.get("href", "")
+                elif t in ("pubdate", "updated", "published", "date"):
+                    rec["date"] = rec["date"] or (ch.text or "").strip()
+            if rec["link"]:
+                out.append(rec)
+    return out
+
+
+def load_resources() -> list:
+    if not RESOURCES_PATH.exists():
+        return []
+    items = []
+    for line in RESOURCES_PATH.read_text(encoding="utf-8").splitlines():
+        if line.strip():
+            try:
+                items.append(json.loads(line))
+            except json.JSONDecodeError:
+                pass
+    return items
+
+
+def append_resources(items: list):
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    with RESOURCES_PATH.open("a", encoding="utf-8") as f:
+        for it in items:
+            f.write(json.dumps(it, ensure_ascii=False) + "\n")
+
+
+def collect_resources(api_key: str, seen_urls: set) -> list:
+    """resource_sources를 순회하며 robots 허용 시 수집·요약. 신규 자료 리스트 반환."""
+    new = []
+    for src in CONFIG.get("resource_sources", []):
+        url = src["url"]
+        try:
+            if not robots_allowed(url):
+                log(f"  [국내자료] robots.txt 비허용 → 건너뜀: {src['label']}")
+                continue
+            if src.get("kind") == "rss":
+                r = requests.get(url, headers={"User-Agent": CONFIG.get("crawler_user_agent", "seoa-care-agent")}, timeout=30)
+                r.raise_for_status()
+                for e in _parse_rss(r.text):
+                    if e["link"] in seen_urls or not robots_allowed(e["link"]):
+                        continue
+                    try:
+                        text = fetch_text(e["link"])
+                    except Exception:
+                        text = e["title"]
+                    ai = ai_summarize_resource(e["title"], text, api_key) if api_key else None
+                    new.append({"source": src["label"], "title": e["title"] or src["label"],
+                                "url": e["link"], "date": (e["date"] or "")[:10], "ai": ai})
+                    seen_urls.add(e["link"]); time.sleep(0.5)
+            else:  # page
+                if url in seen_urls:
+                    continue
+                text = fetch_text(url)
+                ai = ai_summarize_resource(src.get("title", src["label"]), text, api_key) if api_key else None
+                new.append({"source": src["label"], "title": src.get("title", src["label"]),
+                            "url": url, "date": dt.date.today().isoformat(), "ai": ai})
+                seen_urls.add(url); time.sleep(0.5)
+        except Exception as e:
+            log(f"  ! [국내자료] 수집 실패({src['label']}): {e}")
+    return new
+
+
+# ==========================================================================
 # 6. 종합 분석 (synthesis)  -- 맵-리듀스 + 가드레일
 # ==========================================================================
 SYNTH_MAP_SYSTEM = """Sotos/NSD1 논문·임상시험 요약 묶음을 받아, 이 묶음에서 드러나는
@@ -403,7 +566,8 @@ def synthesize(items_with_ai: list, api_key: str) -> dict | None:
 # ==========================================================================
 # 7. 대시보드 렌더링 (살아있는 단일 페이지)  -- 데이터와 분리
 # ==========================================================================
-def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime) -> str:
+def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime, resources: list | None = None) -> str:
+    resources = resources or []
     pubmed_n = sum(1 for i in all_items if i["type"] == "pubmed")
     trial_n = sum(1 for i in all_items if i["type"] == "trial")
 
@@ -424,6 +588,19 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime)
             "has_ai": bool(it.get("ai")),
         })
     data_json = json.dumps(slim, ensure_ascii=False).replace("</", "<\\/")
+
+    # 국내 실용자료 데이터
+    res_slim = []
+    for r in resources:
+        ai = r.get("ai") or {}
+        res_slim.append({
+            "source": r.get("source", ""), "title": r.get("title", ""),
+            "url": r.get("url", ""), "date": str(r.get("date", "")),
+            "summary": ai.get("summary_3lines", ""),
+            "relevance": ai.get("relevance", ""),
+            "tips": ai.get("tips", []), "has_ai": bool(r.get("ai")),
+        })
+    res_json = json.dumps(res_slim, ensure_ascii=False).replace("</", "<\\/")
 
     def esc(x):
         return html.escape(str(x or ""))
@@ -486,6 +663,12 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime)
     .qbox{background:var(--soft);border-radius:8px;padding:9px 13px;font-size:.86rem}
     .qbox ul{margin:4px 0 0;padding-left:17px}
     .muted{color:var(--muted)}
+    .sections{display:flex;gap:4px;border-bottom:2px solid var(--line);margin:6px 0 8px}
+    .secbtn{font-family:'Lora',serif;font-size:1.05rem;padding:9px 18px;border:none;background:none;cursor:pointer;color:var(--muted);border-bottom:3px solid transparent;margin-bottom:-2px}
+    .secbtn.active{color:var(--accent);border-bottom-color:var(--accent)}
+    .secbtn .n{font-family:'Noto Sans KR';font-size:.72rem;opacity:.7}
+    .res-intro{color:var(--muted);font-size:.86rem;margin:14px 0 16px}
+    .src-res{background:#8a6d3b}
     .domains{display:flex;gap:7px;flex-wrap:wrap;margin:18px 0 4px}
     .dombtn{font-family:inherit;font-size:.86rem;font-weight:500;padding:8px 15px;border:1px solid var(--line);background:#fff;border-radius:9px;cursor:pointer;color:var(--ink)}
     .dombtn:hover{border-color:var(--accent)}
@@ -509,6 +692,7 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime)
     js = """
     const ITEMS = __DATA__;
     const DOMAINS = __DOMAINS__;
+    const RESOURCES = __RESOURCES__;
     const PAGE = 30;
     const TOPIC_ORDER=['유전·진단','성장·발달','신경·인지·행동','종양·감시','합병증·동반질환','치료·관리','기전·기초연구','기타','미분류'];
     const STAGE_ORDER=['리뷰','관찰연구','초기임상','후기임상','전임상','사례보고','기타','미분석'];
@@ -601,12 +785,47 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime)
     typeEl.addEventListener('change',()=>{typeF=typeEl.value;shown=PAGE;render();});
     yearEl.addEventListener('change',()=>{yearF=yearEl.value;shown=PAGE;render();});
     moreEl.addEventListener('click',()=>{shown+=PAGE;render();});
+    // ----- 상단 섹션 전환 (연구 / 국내 실용자료) -----
+    const secResearch=document.getElementById('sec-research');
+    const secResources=document.getElementById('sec-resources');
+    const sectionsEl=document.getElementById('sections');
+    function buildSections(){
+      sectionsEl.innerHTML=
+        `<button class="secbtn active" data-s="research">연구</button>`+
+        `<button class="secbtn" data-s="resources">국내 실용자료 <span class="n">${RESOURCES.length}</span></button>`;
+      sectionsEl.querySelectorAll('.secbtn').forEach(b=>b.onclick=()=>{
+        sectionsEl.querySelectorAll('.secbtn').forEach(x=>x.classList.remove('active'));
+        b.classList.add('active');
+        const r=b.dataset.s==='research';
+        secResearch.style.display=r?'block':'none';
+        secResources.style.display=r?'none':'block';
+      });
+    }
+    function renderResources(){
+      const el=document.getElementById('reslist');
+      if(!RESOURCES.length){el.innerHTML='<p class="muted">아직 수집된 국내 자료가 없습니다. CONFIG의 resource_sources에 신뢰하는 공식 페이지를 추가하세요.</p>';return;}
+      el.innerHTML=RESOURCES.map(r=>{
+        const tips=(r.tips||[]).map(t=>`<li>${esc(t)}</li>`).join('');
+        const body=r.has_ai
+          ? `<p class="summary">${esc(r.summary)}</p>`+
+            (r.relevance?`<p class="relevance"><b>도움 포인트:</b> ${esc(r.relevance)}</p>`:'')+
+            (tips?`<div class="qbox"><b>활용 팁</b><ul>${tips}</ul></div>`:'')
+          : `<p class="summary muted">정리 대기 중 — 원문 링크 참고</p>`;
+        return `<article class="item"><div class="item-head"><span class="src src-res">${esc(r.source)}</span>`+
+          (r.date?`<span class="badge">${esc(r.date)}</span>`:'')+`</div>`+
+          `<h3><a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.title)}</a></h3>${body}</article>`;
+      }).join('');
+    }
+    buildSections();
+    renderResources();
     buildDomains();
     buildAxis();
     buildTabs();
     render();
     """
-    js = js.replace("__DATA__", data_json).replace("__DOMAINS__", json.dumps(DOMAIN_LABELS, ensure_ascii=False))
+    js = (js.replace("__DATA__", data_json)
+            .replace("__DOMAINS__", json.dumps(DOMAIN_LABELS, ensure_ascii=False))
+            .replace("__RESOURCES__", res_json))
 
     return (
         "<!DOCTYPE html><html lang='ko'><head><meta charset='utf-8'>"
@@ -619,6 +838,8 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime)
         f"<p class='sub'>마지막 갱신 {run_time:%Y-%m-%d %H:%M} · 논문 {pubmed_n} · 임상시험 {trial_n}</p>"
         "<div class='disclaimer'><b>읽기 전에.</b> 검색·정리를 돕는 도구가 만든 자료입니다. "
         "요약·분석은 부정확할 수 있으며 진단·치료 판단이 아닙니다. <b>모든 내용은 원문과 담당 의료진을 통해 확인</b>하세요.</div>"
+        "<div class='sections' id='sections'></div>"
+        "<div id='sec-research'>"
         f"{synth_html}"
         "<div class='domains' id='domains'></div>"
         "<div class='axis' id='axis'></div>"
@@ -629,7 +850,11 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime)
         "<select id='year'></select></div>"
         "<div class='countbar' id='countbar'></div><div id='list'></div>"
         "<button class='more-btn' id='more' style='display:none'></button>"
-        "<footer>누적 기록: data/knowledge_base.jsonl · 검색식·주기는 스크립트 CONFIG에서 수정 · v2.0</footer>"
+        "</div>"
+        "<div id='sec-resources' style='display:none'>"
+        "<p class='res-intro'>국내 공식 사이트에서 robots.txt를 지키며 모은 실용 자료입니다. 원문 확인은 각 링크에서.</p>"
+        "<div id='reslist'></div></div>"
+        "<footer>누적 기록: data/knowledge_base.jsonl · data/resources.jsonl · 설정은 스크립트 CONFIG · v3.0</footer>"
         f"<script>{js}</script></div></body></html>"
     )
 
@@ -663,6 +888,11 @@ DEMO_SYNTH = {"overview": "이것은 오프라인 미리보기용 샘플 종합 
                          {"title": "성장 관리", "detail": "샘플 주제 설명."}],
               "recent_developments": "샘플 동향.", "questions_for_doctor": ["샘플 질문 1", "샘플 질문 2"],
               "generated_at": dt.datetime.now().isoformat(), "based_on": 2}
+DEMO_RESOURCES = [
+    {"source": "국립재활원 재활정보포털", "title": "장애아동 질병과 재활치료", "url": "https://www.nrc.go.kr/",
+     "date": "2026-06-01", "ai": {"summary_3lines": "샘플 자료 요약입니다.",
+     "relevance": "자조·운동 훈련 관련 예시.", "tips": ["가정에서 일상생활동작 반복 연습"]}},
+]
 
 
 def main():
@@ -690,8 +920,25 @@ def main():
     # ----- 데모 -----
     if "--demo" in sys.argv:
         log("DEMO 모드: 샘플로 대시보드만 생성합니다.")
-        INDEX_PATH.write_text(render_dashboard(DEMO_ITEMS, DEMO_SYNTH, run_time), encoding="utf-8")
+        INDEX_PATH.write_text(render_dashboard(DEMO_ITEMS, DEMO_SYNTH, run_time, DEMO_RESOURCES), encoding="utf-8")
         log(f"대시보드 생성 → {INDEX_PATH}")
+        return
+
+    # ----- 국내 실용자료만 (재)수집 -----
+    if "--resources" in sys.argv:
+        api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+        seen = load_seen()
+        seen_urls = set(seen.get("resources", []))
+        log("국내 실용자료 수집 중…")
+        new_res = collect_resources(api_key, seen_urls)
+        if new_res:
+            append_resources(new_res)
+            seen["resources"] = list(seen_urls)
+            save_seen(seen)
+        log(f"국내 실용자료 신규 {len(new_res)}건")
+        synth = json.loads(SYNTH_PATH.read_text(encoding="utf-8")) if SYNTH_PATH.exists() else None
+        INDEX_PATH.write_text(render_dashboard(load_kb(), synth, run_time, load_resources()), encoding="utf-8")
+        log(f"대시보드 재발행 → {INDEX_PATH}")
         return
 
     # ----- 기존 항목 주제 분류 (일회성) -----
@@ -723,7 +970,7 @@ def main():
         if SYNTH_PATH.exists():
             try: synth = json.loads(SYNTH_PATH.read_text(encoding="utf-8"))
             except Exception: synth = None
-        INDEX_PATH.write_text(render_dashboard(items, synth, run_time), encoding="utf-8")
+        INDEX_PATH.write_text(render_dashboard(items, synth, run_time, load_resources()), encoding="utf-8")
         log(f"대시보드 재발행 → {INDEX_PATH}  (전체 {len(items)}건)")
         return
 
@@ -807,9 +1054,23 @@ def main():
             SYNTH_PATH.write_text(json.dumps(synth, ensure_ascii=False, indent=2), encoding="utf-8")
             log("종합 분석 갱신 완료.")
 
+    # --- 국내 실용자료 수집 (선택·격리: 실패해도 본 시스템에 영향 없음) ---
+    if CONFIG.get("resource_sources"):
+        try:
+            seen_urls = set(seen.get("resources", []))
+            log("국내 실용자료 수집 중…")
+            new_res = collect_resources(api_key, seen_urls)
+            if new_res:
+                append_resources(new_res)
+                seen["resources"] = list(seen_urls)
+                save_seen(seen)
+                log(f"국내 실용자료 신규 {len(new_res)}건")
+        except Exception as e:
+            log(f"! 국내 실용자료 단계 오류(무시): {e}")
+
     # --- 대시보드 발행 ---
-    INDEX_PATH.write_text(render_dashboard(all_items, synth, run_time), encoding="utf-8")
-    log(f"대시보드 발행 → {INDEX_PATH}  (전체 {len(all_items)}건)")
+    INDEX_PATH.write_text(render_dashboard(all_items, synth, run_time, load_resources()), encoding="utf-8")
+    log(f"대시보드 발행 → {INDEX_PATH}  (연구 {len(all_items)}건)")
 
 
 if __name__ == "__main__":

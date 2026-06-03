@@ -103,12 +103,13 @@ CONFIG = {
 # 연구 '영역(domain)'별 검색 스트림. 영역을 추가/수정하려면 여기만 고치면 됩니다.
 #  - lookback_days: 평소(증분) 수집 범위 / backfill_lookback_days: 최초 전체 수집 범위
 #  - 발달치료는 연구량이 매우 많으므로 범위를 좁히고(3년) 질의를 소아·실용 중심으로 한정
+#  - lookback_days=21: 2주 단위(매월 1·15일, 최대 약 16일 간격) 실행에서 누락이 없도록 여유 있게. (중복은 seen.json으로 자동 제거)
 STREAMS = [
     {
         "id": "sotos", "label": "Sotos 연구",
         "pubmed_query": '("Sotos syndrome"[Title/Abstract] OR "NSD1"[Title/Abstract])',
         "ctgov_condition": "Sotos syndrome", "ctgov_term": "NSD1",
-        "lookback_days": 30, "backfill_lookback_days": 7300,   # ≈20년
+        "lookback_days": 21, "backfill_lookback_days": 7300,   # ≈20년
     },
     {
         "id": "therapy", "label": "발달치료 연구",
@@ -119,7 +120,7 @@ STREAMS = [
                          'OR "cognitive intervention"[Title/Abstract] OR "motor intervention"[Title/Abstract]) '
                          'AND ("child"[Title/Abstract] OR "children"[Title/Abstract] OR "pediatric"[Title/Abstract]))'),
         "ctgov_condition": "developmental delay", "ctgov_term": "rehabilitation",
-        "lookback_days": 30, "backfill_lookback_days": 1095,    # ≈3년 (양이 많아 범위 한정)
+        "lookback_days": 21, "backfill_lookback_days": 1095,    # ≈3년 (양이 많아 범위 한정)
     },
 ]
 # 대시보드 영역 라벨 (id -> 표시명)
@@ -525,38 +526,42 @@ def collect_resources(api_key: str, seen_urls: set) -> list:
 # ==========================================================================
 # 6. 종합 분석 (synthesis)  -- 맵-리듀스 + 가드레일
 # ==========================================================================
-SYNTH_MAP_SYSTEM = """Sotos/NSD1 논문·임상시험 요약 묶음을 받아, 이 묶음에서 드러나는
-연구 주제와 핵심 발견을 한국어로 간결히 정리하세요. 진단·치료 권고 금지, 원문 범위 내에서만.
-형식: 주제별로 'ㆍ주제: 핵심 발견(연구 단계)' 한 줄씩. 다른 군더더기 없이."""
+SYNTH_MAP_SYSTEM = """의학 논문·임상시험 정보 묶음을 받습니다. 비전문가 보호자가 이해하도록
+'쉬운 한국어'로, 이 묶음의 핵심 내용을 짧게 정리하세요. 어려운 의학용어는 가능한 풀어서 씁니다.
+진단·치료 권고 금지, 자료 범위 안에서만. 형식: 'ㆍ소주제: 쉬운 설명' 한 줄씩, 군더더기 없이."""
 
-SYNTH_REDUCE_SYSTEM = """당신은 Sotos/NSD1 연구 동향을 보호자에게 정리해 주는 분석가입니다.
-여러 묶음의 주제 메모를 종합해, 전체 그림을 한국어로 정리하세요.
-규칙: 진단·치료 권고 금지. 근거 수준(확립/임상/전임상/초기)을 구분해 표기. 과장 금지.
+SYNTH_REDUCE_SYSTEM = """당신은 의학 연구 동향을 '비전문가 보호자'에게 쉽게 풀어 주는 안내자입니다.
+여러 묶음 메모를 종합해 전체 그림을 '쉬운 한국어'로 정리하세요.
+규칙: 진단·치료 권고 금지. 전문용어는 최대한 일상어로 바꾸고, 꼭 남겨야 하는 용어만 glossary에 한 문장으로 풀이.
+과장 금지. '이미 확실한 것'과 '아직 연구 중인 것'을 구분해 표현.
 아래 JSON '하나만' 출력(코드펜스 금지):
 {
-  "overview": "전체 연구 지형을 2~3문장으로",
-  "themes": [{"title": "주제명", "detail": "핵심 발견과 근거 수준을 2~4문장으로"}],
-  "recent_developments": "최근 새롭거나 주목할 흐름 2~3문장(없으면 '특이 동향 없음')",
-  "questions_for_doctor": ["보호자가 의료진과 논의할 큰 그림 질문 3~5개"]
+  "overview": "전체 그림을 쉬운 말로 2~3문장",
+  "themes": [{"title": "쉬운 소제목", "detail": "핵심을 쉬운 말로 2~4문장(확립된 것/연구 중인 것 구분)"}],
+  "recent_developments": "최근 주목할 흐름 2~3문장(없으면 '특이 동향 없음')",
+  "glossary": [{"term": "어려운 용어", "explain": "한 문장 쉬운 풀이"}],
+  "questions_for_doctor": ["보호자가 의료진과 논의할 쉬운 질문 3~5개"]
 }"""
 
 
-def synthesize(items_with_ai: list, api_key: str) -> dict | None:
-    """AI 요약이 있는 항목들을 맵-리듀스로 종합 분석."""
-    usable = [i for i in items_with_ai if i.get("ai")]
+def synthesize(all_items: list, api_key: str) -> dict | None:
+    """전체 항목(요약이 있으면 요약, 없으면 초록 일부)을 맵-리듀스로 종합 분석.
+    일부만 AI 요약된 경우에도 전체 데이터를 반영합니다."""
+    usable = [i for i in all_items if i.get("title")]
     if not usable:
         return None
     bs = CONFIG["synthesis_batch_size"]
     batch_notes = []
-    log(f"종합 분석: {len(usable)}건을 {bs}건씩 묶어 처리…")
+    log(f"종합 분석: 전체 {len(usable)}건을 {bs}건씩 묶어 처리…")
     for start in range(0, len(usable), bs):
         batch = usable[start:start + bs]
         lines = []
         for it in batch:
-            ai = it["ai"]
-            lines.append(f"[{it['type']}] {it['title']} / 단계:{ai.get('study_stage','')} / "
-                         f"{ai.get('summary_3lines','')}")
-        user = "다음 요약 묶음을 정리:\n" + "\n".join(lines)
+            ai = it.get("ai") or {}
+            txt = ai.get("summary_3lines") or (it.get("raw_text", "")[:300])
+            stage = ai.get("study_stage", "")
+            lines.append(f"[{it.get('domain','sotos')}/{it['type']}] {it['title']} / {stage} / {txt}")
+        user = "다음 자료 묶음을 쉬운 말로 정리:\n" + "\n".join(lines)
         try:
             note = _call_anthropic(api_key, SYNTH_MAP_SYSTEM, user, CONFIG["synthesis_max_tokens"])
             batch_notes.append(note.strip())
@@ -567,7 +572,7 @@ def synthesize(items_with_ai: list, api_key: str) -> dict | None:
 
     if not batch_notes:
         return None
-    reduce_user = "다음은 여러 묶음의 주제 메모입니다. 전체를 종합하세요:\n\n" + "\n\n".join(batch_notes)
+    reduce_user = "다음은 여러 묶음의 메모입니다. 전체를 쉬운 말로 종합하세요:\n\n" + "\n\n".join(batch_notes)
     try:
         result = _parse_json_loose(_call_anthropic(api_key, SYNTH_REDUCE_SYSTEM, reduce_user,
                                                    CONFIG["synthesis_max_tokens"]))
@@ -633,16 +638,23 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime,
             f'<div class="theme"><h4>{esc(t.get("title"))}</h4><p>{esc(t.get("detail"))}</p></div>'
             for t in synth.get("themes", []))
         q = "".join(f"<li>{esc(x)}</li>" for x in synth.get("questions_for_doctor", []))
+        glossary = synth.get("glossary", []) or []
+        gl_items = "".join(
+            f'<div class="gl"><b>{esc(g.get("term"))}</b> — {esc(g.get("explain"))}</div>'
+            for g in glossary if g.get("term"))
+        gl_html = (f'<div class="glossary"><div class="callout-title">쉽게 풀어 본 용어</div>{gl_items}</div>'
+                   if gl_items else "")
         synth_html = f"""
         <section class="synthesis">
-          <div class="synth-head">종합 분석 <span class="synth-meta">{esc(synth.get('based_on'))}건 기반 · {esc((synth.get('generated_at') or '')[:10])}</span></div>
+          <div class="synth-head">종합 분석 <span class="synth-meta">전체 {esc(synth.get('based_on'))}건 기반 · {esc((synth.get('generated_at') or '')[:10])} 자동 갱신</span></div>
           <p class="synth-overview">{esc(synth.get('overview'))}</p>
           <div class="themes">{themes}</div>
           <p class="synth-recent"><b>최근 동향.</b> {esc(synth.get('recent_developments'))}</p>
-          <div class="callout"><div class="callout-title">의료진과 논의할 큰 그림 질문</div><ul>{q}</ul></div>
+          {gl_html}
+          <div class="callout"><div class="callout-title">의료진과 논의하면 좋은 질문</div><ul>{q}</ul></div>
         </section>"""
     else:
-        synth_html = '<section class="synthesis"><p class="muted">종합 분석은 항목이 모이면 생성됩니다.</p></section>'
+        synth_html = '<section class="synthesis"><p class="muted">종합 분석은 자료가 모이면 자동으로 생성됩니다.</p></section>'
 
     css = """
     :root{--bg:#faf8f4;--ink:#1c1a17;--muted:#6b6457;--line:#e6e0d6;--card:#fff;
@@ -691,6 +703,10 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime,
     .secbtn .n{font-family:'Noto Sans KR';font-size:.72rem;opacity:.7}
     .res-intro{color:var(--muted);font-size:.86rem;margin:14px 0 16px}
     .src-res{background:#8a6d3b}
+    .glossary{background:var(--soft);border-radius:12px;padding:14px 16px;margin:14px 0}
+    .glossary .gl{font-size:.88rem;margin:5px 0;color:var(--ink)}
+    .glossary .gl b{color:var(--accent)}
+    .cal-rep-lbl{align-self:center;font-size:.82rem;color:var(--muted)}
     .cal-setup,.cal-login{background:#fff;border:1px solid var(--line);border-radius:12px;padding:22px;margin-top:18px;max-width:420px}
     .cal-login input{display:block;width:100%;box-sizing:border-box;margin:8px 0;padding:10px 12px;border:1px solid var(--line);border-radius:8px;font-family:inherit;font-size:.95rem}
     .cal-btn{font-family:inherit;font-weight:600;padding:9px 18px;border:none;border-radius:8px;background:var(--accent);color:#fff;cursor:pointer}
@@ -771,11 +787,18 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime,
     }
     function buildDomains(){
       const counts={}; ITEMS.forEach(it=>{const d=domainOf(it);counts[d]=(counts[d]||0)+1;});
-      let h=`<button class="dombtn${domainF==='all'?' active':''}" data-d="all">전체 영역 <span class="n">${ITEMS.length}</span></button>`;
+      let h=`<button class="dombtn${domainF==='all'?' active':''}" data-d="all">전체 연구 <span class="n">${ITEMS.length}</span></button>`;
       h+=Object.keys(DOMAINS).map(d=>`<button class="dombtn${domainF===d?' active':''}" data-d="${esc(d)}">${esc(DOMAINS[d])} <span class="n">${counts[d]||0}</span></button>`).join('');
+      h+=`<button class="dombtn${domainF==='resources'?' active':''}" data-d="resources">국내 실용자료 <span class="n">${RESOURCES.length}</span></button>`;
       domainsEl.innerHTML=h;
       domainsEl.querySelectorAll('.dombtn').forEach(b=>b.onclick=()=>{
-        domainF=b.dataset.d; tabVal='전체'; shown=PAGE; buildDomains(); buildTabs(); render();});
+        domainF=b.dataset.d; tabVal='전체'; shown=PAGE; buildDomains(); applyDomainView();});
+    }
+    function applyDomainView(){
+      const isRes=domainF==='resources';
+      document.getElementById('paper-view').style.display=isRes?'none':'block';
+      document.getElementById('res-view').style.display=isRes?'block':'none';
+      if(isRes){ renderResources(); } else { buildTabs(); render(); }
     }
     function buildTabs(){
       const pool=ITEMS.filter(inDomain);
@@ -831,9 +854,9 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime,
     typeEl.addEventListener('change',()=>{typeF=typeEl.value;shown=PAGE;render();});
     yearEl.addEventListener('change',()=>{yearF=yearEl.value;shown=PAGE;render();});
     moreEl.addEventListener('click',()=>{shown+=PAGE;render();});
-    // ----- 상단 섹션 전환 (연구 / 국내 실용자료 / 캘린더) -----
+    // ----- 상단 섹션 전환 (캘린더 / 연구 / 종합분석) -----
     const sectionsEl=document.getElementById('sections');
-    const SECS=[['research','연구',''],['resources','국내 실용자료',RESOURCES.length],['calendar','캘린더','']];
+    const SECS=[['calendar','캘린더'],['research','연구'],['synthesis','종합분석']];
     let calInited=false;
     function showSection(key){
       sectionsEl.querySelectorAll('.secbtn').forEach(x=>x.classList.toggle('active',x.dataset.s===key));
@@ -841,8 +864,8 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime,
       if(key==='calendar' && !calInited){calInited=true; initCalendar();}
     }
     function buildSections(){
-      sectionsEl.innerHTML=SECS.map(([k,label,n])=>
-        `<button class="secbtn${k==='research'?' active':''}" data-s="${k}">${esc(label)}${n!==''?` <span class="n">${n}</span>`:''}</button>`).join('');
+      sectionsEl.innerHTML=SECS.map(([k,label],i)=>
+        `<button class="secbtn${i===0?' active':''}" data-s="${k}">${esc(label)}</button>`).join('');
       sectionsEl.querySelectorAll('.secbtn').forEach(b=>b.onclick=()=>showSection(b.dataset.s));
     }
     function renderResources(){
@@ -896,13 +919,29 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime,
         err=>{calEl('cal-app').insertAdjacentHTML('afterbegin','<p class="muted">읽기 권한 오류(보안 규칙 확인): '+esc(err.message)+'</p>');});
     }
     function addEventFromForm(){
-      const date=calEl('cal-date').value, time=calEl('cal-time').value, title=calEl('cal-title').value.trim(), cat=calEl('cal-cat').value, memo=calEl('cal-memo').value.trim();
+      const date=calEl('cal-date').value, time=calEl('cal-time').value, title=calEl('cal-title').value.trim(), cat=calEl('cal-cat').value, memo=calEl('cal-memo').value.trim(), until=calEl('cal-until').value;
       if(!date||!title){alert('날짜와 제목은 필수입니다.');return;}
-      fbDB.ref('calendar/events').push({date,time,title,cat,memo,by:calUser.email,ts:Date.now()})
-        .then(()=>{calEl('cal-title').value='';calEl('cal-memo').value='';})
-        .catch(e=>alert('저장 실패(권한 확인): '+e.message));
+      const base={time,title,cat,memo,by:calUser.email,ts:Date.now()};
+      const ref=fbDB.ref('calendar/events');
+      const clear=()=>{calEl('cal-title').value='';calEl('cal-memo').value='';calEl('cal-until').value='';};
+      if(until && until>=date){
+        const series='s'+Date.now();
+        let cur=new Date(date+'T00:00:00'); const end=new Date(until+'T00:00:00'); let n=0;
+        while(cur<=end && n<200){ ref.push({...base, date:ymd(cur), series}); cur.setDate(cur.getDate()+7); n++; }
+        clear(); alert(`매주 같은 요일로 ${n}건 등록했습니다.`);
+      } else {
+        ref.push({...base, date}).then(clear).catch(e=>alert('저장 실패(권한 확인): '+e.message));
+      }
     }
-    function delEvent(id){ if(confirm('이 일정을 삭제할까요?')) fbDB.ref('calendar/events/'+id).remove().catch(e=>alert('삭제 실패: '+e.message)); }
+    function delEvent(id){
+      const ev=calEvents[id]; if(!ev) return;
+      if(!confirm('이 일정을 삭제할까요?')) return;
+      fbDB.ref('calendar/events/'+id).remove().then(()=>{
+        if(ev.series && confirm('같은 매주 반복 일정 전체도 삭제할까요?')){
+          Object.keys(calEvents).forEach(k=>{ if(calEvents[k] && calEvents[k].series===ev.series) fbDB.ref('calendar/events/'+k).remove(); });
+        }
+      }).catch(e=>alert('삭제 실패: '+e.message));
+    }
     window.__delEvent=delEvent;
     function ymd(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
     function renderCal(){
@@ -917,7 +956,7 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime,
         const ds=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
         const evs=(byDate[ds]||[]).sort((a,b)=>(a.time||'').localeCompare(b.time||''));
         const chips=evs.map(e=>`<div class="cal-ev" style="background:${CATCOLOR[e.cat]||'#8a8f99'}" title="${esc(e.title)} ${esc(e.memo||'')} (${esc(e.by||'')})">`+
-          `<span>${e.time?esc(e.time)+' ':''}${esc(e.title)}</span>`+
+          `<span>${e.series?'⟲ ':''}${e.time?esc(e.time)+' ':''}${esc(e.title)}</span>`+
           `<button class="cal-del" onclick="__delEvent('${e.id}')">×</button></div>`).join('');
         cells+=`<div class="cal-cell${ds===today?' cal-today':''}"><div class="cal-d">${d}</div>${chips}</div>`;
       }
@@ -927,11 +966,10 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime,
       calEl('cal-legend').innerHTML=CATS.map(c=>`<span class="cal-lg"><i style="background:${CATCOLOR[c]||'#8a8f99'}"></i>${esc(c)}</span>`).join('');
     }
     buildSections();
-    renderResources();
     buildDomains();
     buildAxis();
-    buildTabs();
-    render();
+    applyDomainView();
+    showSection('calendar');
     """
     js = (js.replace("__DATA__", data_json)
             .replace("__DOMAINS__", json.dumps(DOMAIN_LABELS, ensure_ascii=False))
@@ -951,22 +989,8 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime,
         "<div class='disclaimer'><b>읽기 전에.</b> 검색·정리를 돕는 도구가 만든 자료입니다. "
         "요약·분석은 부정확할 수 있으며 진단·치료 판단이 아닙니다. <b>모든 내용은 원문과 담당 의료진을 통해 확인</b>하세요.</div>"
         "<div class='sections' id='sections'></div>"
-        "<div id='sec-research'>"
-        f"{synth_html}"
-        "<div class='domains' id='domains'></div>"
-        "<div class='axis' id='axis'></div>"
-        "<div class='tabs' id='tabs'></div>"
-        "<div class='controls'><input id='q' placeholder='검색어 (제목·요약 내)'>"
-        "<select id='type'><option value='all'>전체 종류</option>"
-        "<option value='pubmed'>논문</option><option value='trial'>임상시험</option></select>"
-        "<select id='year'></select></div>"
-        "<div class='countbar' id='countbar'></div><div id='list'></div>"
-        "<button class='more-btn' id='more' style='display:none'></button>"
-        "</div>"
-        "<div id='sec-resources' style='display:none'>"
-        "<p class='res-intro'>국내 공식 사이트에서 robots.txt를 지키며 모은 실용 자료입니다. 원문 확인은 각 링크에서.</p>"
-        "<div id='reslist'></div></div>"
-        "<div id='sec-calendar' style='display:none'>"
+        # ===== 캘린더 (기본 진입) =====
+        "<div id='sec-calendar'>"
         "<div id='cal-setup' style='display:none' class='cal-setup'>"
         "<b>공유 캘린더를 쓰려면 Firebase 설정이 필요합니다.</b><br>"
         "스크립트 CONFIG의 <code>firebase_config</code>에 Firebase 웹 앱 설정을 넣고, Realtime Database 보안 규칙으로 두 분만 접근하도록 잠그세요. 자세한 절차는 대화의 안내를 참고하세요.</div>"
@@ -984,13 +1008,35 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime,
         "<select id='cal-cat'></select>"
         "<input id='cal-title' placeholder='일정 (예: 인지치료)'>"
         "<input id='cal-memo' placeholder='메모 (선택)'>"
+        "<span class='cal-rep-lbl'>매주 반복 종료일</span><input id='cal-until' type='date' title='이 날짜까지 매주 같은 요일에 반복 (선택)'>"
         "<button id='cal-add' class='cal-btn'>추가</button></div>"
         "<div id='cal-legend' class='cal-legend'></div>"
         "<div class='cal-nav'><button id='cal-prev' class='cal-link'>‹ 이전</button>"
         "<b id='cal-label'></b><button id='cal-next' class='cal-link'>다음 ›</button></div>"
         "<div id='cal-grid' class='cal-grid'></div></div>"
         "</div>"
-        "<footer>누적 기록: data/knowledge_base.jsonl · data/resources.jsonl · 설정은 스크립트 CONFIG · v3.0</footer>"
+        # ===== 연구 (영역 병렬: Sotos / 발달치료 / 국내 실용자료) =====
+        "<div id='sec-research' style='display:none'>"
+        "<div class='domains' id='domains'></div>"
+        "<div id='paper-view'>"
+        "<div class='axis' id='axis'></div>"
+        "<div class='tabs' id='tabs'></div>"
+        "<div class='controls'><input id='q' placeholder='검색어 (제목·요약 내)'>"
+        "<select id='type'><option value='all'>전체 종류</option>"
+        "<option value='pubmed'>논문</option><option value='trial'>임상시험</option></select>"
+        "<select id='year'></select></div>"
+        "<div class='countbar' id='countbar'></div><div id='list'></div>"
+        "<button class='more-btn' id='more' style='display:none'></button>"
+        "</div>"
+        "<div id='res-view' style='display:none'>"
+        "<p class='res-intro'>국내 공식 사이트에서 robots.txt를 지키며 모은 실용 자료입니다. 원문 확인은 각 링크에서.</p>"
+        "<div id='reslist'></div></div>"
+        "</div>"
+        # ===== 종합 분석 =====
+        "<div id='sec-synthesis' style='display:none'>"
+        f"{synth_html}"
+        "</div>"
+        "<footer>누적 기록: data/knowledge_base.jsonl · data/resources.jsonl · 설정은 스크립트 CONFIG · v3.1</footer>"
         + (("<script src='https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js'></script>"
             "<script src='https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js'></script>"
             "<script src='https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js'></script>") if fb_enabled else "")
@@ -1025,8 +1071,11 @@ DEMO_ITEMS = [
 DEMO_SYNTH = {"overview": "이것은 오프라인 미리보기용 샘플 종합 분석입니다.",
               "themes": [{"title": "유전형-표현형", "detail": "샘플 주제 설명."},
                          {"title": "성장 관리", "detail": "샘플 주제 설명."}],
-              "recent_developments": "샘플 동향.", "questions_for_doctor": ["샘플 질문 1", "샘플 질문 2"],
-              "generated_at": dt.datetime.now().isoformat(), "based_on": 2}
+              "recent_developments": "샘플 동향.",
+              "glossary": [{"term": "표현형", "explain": "유전자 변화가 실제 몸·발달에서 어떻게 나타나는지를 뜻합니다."},
+                           {"term": "전임상", "explain": "사람 대상 전 단계로, 주로 세포·동물에서 하는 연구입니다."}],
+              "questions_for_doctor": ["샘플 질문 1", "샘플 질문 2"],
+              "generated_at": dt.datetime.now().isoformat(), "based_on": 733}
 DEMO_RESOURCES = [
     {"source": "국립재활원 재활정보포털", "title": "장애아동 질병과 재활치료", "url": "https://www.nrc.go.kr/",
      "date": "2026-06-01", "ai": {"summary_3lines": "샘플 자료 요약입니다.",
@@ -1186,7 +1235,7 @@ def main():
         try: synth = json.loads(SYNTH_PATH.read_text(encoding="utf-8"))
         except Exception: synth = None
     need_synth = CONFIG["synthesis_enabled"] and use_ai and (backfill or to_process or synth is None)
-    if need_synth and any(i.get("ai") for i in all_items):
+    if need_synth and all_items:
         new_synth = synthesize(all_items, api_key)
         if new_synth:
             synth = new_synth

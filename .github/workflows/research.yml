@@ -13,9 +13,10 @@ on:
         type: choice
         default: normal
         options:
-          - normal      # 평소: 최근 신규만 분석·갱신
+          - normal      # 평소: 최근 신규만 분석·갱신 (+ 국내자료 자동 수집)
           - retag       # 일회성: 기존 전체에 주제 꼬리표 달기
-          - backfill    # 일회성: 과거 20년치 전체 분석
+          - backfill    # 일회성: 과거 전체 분석
+          - resources   # 국내 실용자료만 (재)수집
 
 permissions:
   contents: write
@@ -44,6 +45,8 @@ jobs:
             python sotos_research_agent.py --retag
           elif [ "$MODE" = "backfill" ]; then
             python sotos_research_agent.py --backfill
+          elif [ "$MODE" = "resources" ]; then
+            python sotos_research_agent.py --resources
           else
             python sotos_research_agent.py
           fi

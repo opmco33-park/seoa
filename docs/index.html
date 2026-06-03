@@ -49,13 +49,13 @@
     .glossary .gl{font-size:.88rem;margin:5px 0;color:var(--ink)}
     .glossary .gl b{color:var(--accent)}
     .cal-rep-lbl{align-self:center;font-size:.82rem;color:var(--muted)}
-    .chat-fab{position:fixed;left:20px;bottom:20px;z-index:1000;width:56px;height:56px;border-radius:50%;border:none;background:var(--accent);color:#fff;font-size:1.5rem;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.28)}
+    .chat-fab{position:fixed;right:20px;bottom:20px;z-index:1000;width:56px;height:56px;border-radius:50%;border:none;background:var(--accent);color:#fff;font-size:1.5rem;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.28)}
     .chat-fab:hover{filter:brightness(1.08)}
-    .chat-panel{position:fixed;left:20px;bottom:88px;z-index:1000;width:min(420px,92vw);max-height:min(640px,82vh);background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:0 12px 44px rgba(0,0,0,.24);flex-direction:column;overflow:hidden}
+    .chat-panel{position:fixed;right:20px;bottom:88px;z-index:1000;width:min(420px,92vw);max-height:min(640px,82vh);background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:0 12px 44px rgba(0,0,0,.24);flex-direction:column;overflow:hidden}
     .chat-panel-head{display:flex;justify-content:space-between;align-items:center;padding:11px 16px;border-bottom:1px solid var(--line);font-family:'Lora',serif;font-size:1.05rem;flex:0 0 auto}
     .chat-close{border:none;background:none;font-size:1.4rem;line-height:1;cursor:pointer;color:var(--muted)}
     .chat-body{padding:14px 16px;overflow-y:auto}
-    @media(max-width:480px){.chat-panel{left:4vw;width:92vw;bottom:84px}}
+    @media(max-width:480px){.chat-panel{right:4vw;width:92vw;bottom:84px}}
     .chat-keybox{background:var(--soft);border-radius:10px;padding:12px 14px;margin:10px 0;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
     .chat-keybox input{flex:1;min-width:160px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-family:inherit}
     .chat-log{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px;min-height:160px;max-height:320px;overflow-y:auto;margin:10px 0}
@@ -91,6 +91,18 @@
     .cal-ev span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .cal-del{border:none;background:rgba(0,0,0,.18);color:#fff;border-radius:4px;cursor:pointer;font-size:.7rem;line-height:1;padding:1px 4px}
     @media(max-width:640px){.cal-cell{min-height:62px}.cal-ev{font-size:.66rem}}
+    .cal-agenda-h{font-family:'Lora',serif;font-size:1.05rem;margin:22px 0 8px}
+    .cal-agenda .ag-row{display:flex;gap:10px;align-items:flex-start;background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:7px}
+    .ag-dot{flex:0 0 auto;width:12px;height:12px;border-radius:50%;margin-top:5px}
+    .ag-main{flex:1;min-width:0}
+    .ag-l1{font-size:.86rem;color:var(--muted)}
+    .ag-cat{background:var(--soft);border-radius:5px;padding:1px 7px;font-size:.76rem}
+    .ag-rep{color:var(--accent);font-size:.74rem}
+    .ag-title{font-weight:600;font-size:1rem;margin:2px 0;word-break:break-word}
+    .ag-memo{font-size:.9rem;color:var(--ink);word-break:break-word;white-space:pre-wrap}
+    .ag-by{font-size:.74rem;color:var(--muted);margin-top:2px}
+    .ag-del{flex:0 0 auto;border:1px solid var(--line);background:#fff;color:var(--muted);border-radius:7px;padding:4px 9px;font-size:.78rem;cursor:pointer;font-family:inherit}
+    .ag-del:hover{border-color:#e05c5c;color:#e05c5c}
     .domains{display:flex;gap:7px;flex-wrap:wrap;margin:18px 0 4px}
     .dombtn{font-family:inherit;font-size:.86rem;font-weight:500;padding:8px 15px;border:1px solid var(--line);background:#fff;border-radius:9px;cursor:pointer;color:var(--ink)}
     .dombtn:hover{border-color:var(--accent)}
@@ -109,7 +121,7 @@
     .more-btn{display:block;width:100%;margin-top:10px;padding:12px;border:1px dashed var(--line);background:#fff;border-radius:10px;cursor:pointer;font-family:inherit;font-size:.9rem;color:var(--accent)}
     .more-btn:hover{border-color:var(--accent);background:var(--soft)}
     footer{margin-top:46px;padding-top:18px;border-top:1px solid var(--line);color:var(--muted);font-size:.78rem}
-    </style></head><body><div class='wrap'><h1>서아 통합 연구·케어</h1><p class='sub'>마지막 갱신 2026-06-03 10:28 · 논문 936 · 임상시험 30</p><div class='disclaimer'><b>읽기 전에.</b> 검색·정리를 돕는 도구가 만든 자료입니다. 요약·분석은 부정확할 수 있으며 진단·치료 판단이 아닙니다. <b>모든 내용은 원문과 담당 의료진을 통해 확인</b>하세요.</div><div class='sections' id='sections'></div><div id='sec-calendar'><div id='cal-setup' style='display:none' class='cal-setup'><b>공유 캘린더를 쓰려면 Firebase 설정이 필요합니다.</b><br>스크립트 CONFIG의 <code>firebase_config</code>에 Firebase 웹 앱 설정을 넣고, Realtime Database 보안 규칙으로 두 분만 접근하도록 잠그세요. 자세한 절차는 대화의 안내를 참고하세요.</div><div id='cal-login' style='display:none' class='cal-login'><h3>로그인</h3><p class='muted'>두 분만 접근할 수 있는 비공개 일정입니다.</p><input id='cal-email' type='email' placeholder='이메일' autocomplete='username'><input id='cal-pw' type='password' placeholder='비밀번호' autocomplete='current-password'><button id='cal-login-btn' class='cal-btn'>로그인</button><div id='cal-err' class='cal-err'></div></div><div id='cal-app' style='display:none'><div class='cal-bar'><span class='muted'>로그인: <b id='cal-who'></b></span><button id='cal-logout' class='cal-link'>로그아웃</button></div><div class='cal-form'><input id='cal-date' type='date'><input id='cal-time' type='time'><select id='cal-cat'></select><input id='cal-title' placeholder='일정 (예: 인지치료)'><input id='cal-memo' placeholder='메모 (선택)'><span class='cal-rep-lbl'>매주 반복 종료일</span><input id='cal-until' type='date' title='이 날짜까지 매주 같은 요일에 반복 (선택)'><button id='cal-add' class='cal-btn'>추가</button></div><div id='cal-legend' class='cal-legend'></div><div class='cal-nav'><button id='cal-prev' class='cal-link'>‹ 이전</button><b id='cal-label'></b><button id='cal-next' class='cal-link'>다음 ›</button></div><div id='cal-grid' class='cal-grid'></div></div></div><button id='chat-fab' class='chat-fab' aria-label='질문하기' title='질문하기'>💬</button><div id='chat-panel' class='chat-panel' style='display:none'><div class='chat-panel-head'><b>질문하기</b><button id='chat-close' class='chat-close' aria-label='닫기'>×</button></div><div class='chat-body'><div id='chat-setup' style='display:none' class='cal-setup'><b>질문하기를 쓰려면 Firebase 설정이 필요합니다.</b> 캘린더와 동일한 설정을 사용합니다.</div><div id='chat-login' style='display:none' class='cal-login'><h3>로그인</h3><p class='muted'>두 분만 사용할 수 있습니다.</p><input id='chat-email' type='email' placeholder='이메일' autocomplete='username'><input id='chat-pw' type='password' placeholder='비밀번호' autocomplete='current-password'><button id='chat-login-btn' class='cal-btn'>로그인</button><div id='chat-err' class='cal-err'></div></div><div id='chat-app' style='display:none'><div class='cal-bar'><span id='chat-key-status' class='muted'></span><button id='chat-logout' class='cal-link'>로그아웃</button></div><div id='chat-key-box' style='display:none' class='chat-keybox'><input id='chat-key-input' type='password' placeholder='Anthropic API 키 (sk-ant-...)'><button id='chat-key-save' class='cal-btn'>키 저장</button><p class='muted' style='font-size:.78rem;margin:6px 0 0'>키는 Firebase에 저장되어 로그인한 두 분만 사용합니다. Anthropic 콘솔에서 월 사용 한도를 걸어두길 권합니다.</p></div><div id='chat-log' class='chat-log'></div><div class='chat-inputbar'><textarea id='chat-input' rows='2' placeholder='질문 (예: 소토스 아동의 성장에 대해 알려줘)'></textarea><button id='chat-send' class='cal-btn'>보내기</button></div><p class='muted' style='font-size:.74rem;margin-top:6px'>답변은 모은 자료(논문·임상·국내자료)에 근거합니다. 의학적 판단은 담당 의료진과 상의하세요.</p></div></div></div><div id='sec-research' style='display:none'><div class='domains' id='domains'></div><div id='paper-view'><div class='axis' id='axis'></div><div class='tabs' id='tabs'></div><div class='controls'><input id='q' placeholder='검색어 (제목·요약 내)'><select id='type'><option value='all'>전체 종류</option><option value='pubmed'>논문</option><option value='trial'>임상시험</option></select><select id='year'></select></div><div class='countbar' id='countbar'></div><div id='list'></div><button class='more-btn' id='more' style='display:none'></button></div><div id='res-view' style='display:none'><p class='res-intro'>국내 공식 사이트에서 robots.txt를 지키며 모은 실용 자료입니다. 원문 확인은 각 링크에서.</p><div id='reslist'></div></div></div><div id='sec-synthesis' style='display:none'>
+    </style></head><body><div class='wrap'><h1>서아 통합 연구·케어</h1><p class='sub'>마지막 갱신 2026-06-03 10:40 · 논문 936 · 임상시험 30</p><div class='disclaimer'><b>읽기 전에.</b> 검색·정리를 돕는 도구가 만든 자료입니다. 요약·분석은 부정확할 수 있으며 진단·치료 판단이 아닙니다. <b>모든 내용은 원문과 담당 의료진을 통해 확인</b>하세요.</div><div class='sections' id='sections'></div><div id='sec-calendar'><div id='cal-setup' style='display:none' class='cal-setup'><b>공유 캘린더를 쓰려면 Firebase 설정이 필요합니다.</b><br>스크립트 CONFIG의 <code>firebase_config</code>에 Firebase 웹 앱 설정을 넣고, Realtime Database 보안 규칙으로 두 분만 접근하도록 잠그세요. 자세한 절차는 대화의 안내를 참고하세요.</div><div id='cal-login' style='display:none' class='cal-login'><h3>로그인</h3><p class='muted'>두 분만 접근할 수 있는 비공개 일정입니다.</p><input id='cal-email' type='email' placeholder='이메일' autocomplete='username'><input id='cal-pw' type='password' placeholder='비밀번호' autocomplete='current-password'><button id='cal-login-btn' class='cal-btn'>로그인</button><div id='cal-err' class='cal-err'></div></div><div id='cal-app' style='display:none'><div class='cal-bar'><span class='muted'>로그인: <b id='cal-who'></b></span><button id='cal-logout' class='cal-link'>로그아웃</button></div><div class='cal-form'><input id='cal-date' type='date'><input id='cal-time' type='time'><select id='cal-cat'></select><input id='cal-title' placeholder='일정 (예: 인지치료)'><input id='cal-memo' placeholder='메모 (선택)'><span class='cal-rep-lbl'>매주 반복 종료일</span><input id='cal-until' type='date' title='이 날짜까지 매주 같은 요일에 반복 (선택)'><button id='cal-add' class='cal-btn'>추가</button></div><div id='cal-legend' class='cal-legend'></div><div class='cal-nav'><button id='cal-prev' class='cal-link'>‹ 이전</button><b id='cal-label'></b><button id='cal-next' class='cal-link'>다음 ›</button></div><div id='cal-grid' class='cal-grid'></div><div class='cal-agenda-h'>이 달 일정</div><div id='cal-agenda' class='cal-agenda'></div></div></div><button id='chat-fab' class='chat-fab' aria-label='질문하기' title='질문하기'>💬</button><div id='chat-panel' class='chat-panel' style='display:none'><div class='chat-panel-head'><b>질문하기</b><button id='chat-close' class='chat-close' aria-label='닫기'>×</button></div><div class='chat-body'><div id='chat-setup' style='display:none' class='cal-setup'><b>질문하기를 쓰려면 Firebase 설정이 필요합니다.</b> 캘린더와 동일한 설정을 사용합니다.</div><div id='chat-login' style='display:none' class='cal-login'><h3>로그인</h3><p class='muted'>두 분만 사용할 수 있습니다.</p><input id='chat-email' type='email' placeholder='이메일' autocomplete='username'><input id='chat-pw' type='password' placeholder='비밀번호' autocomplete='current-password'><button id='chat-login-btn' class='cal-btn'>로그인</button><div id='chat-err' class='cal-err'></div></div><div id='chat-app' style='display:none'><div class='cal-bar'><span id='chat-key-status' class='muted'></span><span><button id='chat-key-edit' class='cal-link' style='display:none'>키 변경</button> <button id='chat-logout' class='cal-link'>로그아웃</button></span></div><div id='chat-key-box' style='display:none' class='chat-keybox'><input id='chat-key-input' type='password' placeholder='Anthropic API 키 (sk-ant-...)'><button id='chat-key-save' class='cal-btn'>키 저장</button><p class='muted' style='font-size:.78rem;margin:6px 0 0'>키는 Firebase에 저장되어 로그인한 두 분만 사용합니다. Anthropic 콘솔에서 월 사용 한도를 걸어두길 권합니다.</p></div><div id='chat-log' class='chat-log'></div><div class='chat-inputbar'><textarea id='chat-input' rows='2' placeholder='질문 (예: 소토스 아동의 성장에 대해 알려줘)'></textarea><button id='chat-send' class='cal-btn'>보내기</button></div><p class='muted' style='font-size:.74rem;margin-top:6px'>답변은 모은 자료(논문·임상·국내자료)에 근거합니다. 의학적 판단은 담당 의료진과 상의하세요.</p></div></div></div><div id='sec-research' style='display:none'><div class='domains' id='domains'></div><div id='paper-view'><div class='axis' id='axis'></div><div class='tabs' id='tabs'></div><div class='controls'><input id='q' placeholder='검색어 (제목·요약 내)'><select id='type'><option value='all'>전체 종류</option><option value='pubmed'>논문</option><option value='trial'>임상시험</option></select><select id='year'></select></div><div class='countbar' id='countbar'></div><div id='list'></div><button class='more-btn' id='more' style='display:none'></button></div><div id='res-view' style='display:none'><p class='res-intro'>국내 공식 사이트에서 robots.txt를 지키며 모은 실용 자료입니다. 원문 확인은 각 링크에서.</p><div id='reslist'></div></div></div><div id='sec-synthesis' style='display:none'>
         <section class="synthesis">
           <div class="synth-head">종합 분석 <span class="synth-meta">전체 37건 기반 · 2026-06-03 자동 갱신</span></div>
           <p class="synth-overview">NSD1은 히스톤 메틸화효소로서 Sotos 증후군의 주요 원인유전자이면서, 소아 급성백혈병(특히 NUP98::NSD1 융합)의 핵심 암유전자로 작용합니다. 최근 연구는 발달 이상과 암 발생 양쪽 경로에서 NSD1의 역할을 규명하고 있으며, 진단 기술과 치료 표적 개발이 진행 중입니다.</p>
@@ -122,7 +134,7 @@
     const DOMAINS = {"sotos": "Sotos 연구", "therapy": "발달치료 연구"};
     const RESOURCES = [{"source": "서울대병원 희귀질환센터", "title": "소토스 증후군 정보", "url": "https://raredisease.snuh.org/rare-disease-info/congenital-malformation/소토스-증후군/", "date": "2026-06-03", "summary": "소토스 증후군은 고신장, 대두증, 학습발달지연, 특징적 얼굴모양을 주요 증상으로 하는 유전질환입니다. 척추측만증, 심장문제, 경련, 콩팥문제 등 동반 증상이 개인차 있게 나타나며, 종양 발생 위험도 있어 정기적 관찰이 필요합니다. 치료는 확립된 가이드라인은 없으나, 진단 후 조기 재활치료와 교육프로그램 조정으로 발달을 지원합니다.", "relevance": "물리·작업·언어치료의 조기 시작이 근력·협응·발음 개선에 효과적이며, 인지발달 수준에 맞춘 교육프로그램과 행동관리 전략(학교 수업도우미, 필요시 약물)이 발달과 자조능력 향상에 직접 도움됩니다.", "tips": ["진단 후 물리·작업·언어치료를 조기에 시작하고, 수영 같은 운동을 꾸준히 하기", "학교에서 수업도우미 지원을 요청하고, 아동의 인지발달 수준에 맞춰 교육프로그램 조정하기", "최소 1년에 1회 이상 외래 진찰을 받아 성장 정도, 척추 휘어짐, 심장·복부 상태를 추적 관찰하고 혈압 측정하기"], "has_ai": true}, {"source": "국립재활원 재활정보포털", "title": "장애아동 질병과 재활치료", "url": "https://www.nrc.go.kr/portal/html/content.do?depth=dc&menu_cd=06_02_02", "date": "2026-06-03", "summary": "뇌성마비는 미성숙한 뇌의 손상으로 운동 및 자세 이상을 보이는 질환이며, 조기 재활치료(물리·작업·언어치료 등)가 필수입니다. 삼킴장애는 음식물을 삼키는 과정의 문제로, 올바른 자세와 직접치료법을 통해 관리할 수 있습니다. 두 질환 모두 아동의 발달 단계에 맞는 맞춤 재활접근이 중요합니다.", "relevance": "물리치료, 작업치료, 언어치료, 인지행동치료 등 재활치료 방법과 일상에서 실천 가능한 자세 교정 및 구강 자극 기법을 제시하여 발달지연 아동의 운동·인지·자조기능 향상에 직결됩니다.", "tips": ["뇌성마비 아동은 2세경에 앉기, 4세경 앉기 능력이 향후 보행 가능성을 나타내는 중요한 지표이므로, 발달 단계별 목표를 의료진과 함께 설정하세요.", "삼킴장애 아동의 식사 시 머리를 자연스럽게 앞으로 숙이고, 발이 바닥에 안정적으로 닿도록 올바른 자세를 유지하는 것이 기본입니다.", "입주변이 예민한 아동에게는 고무장난감 씹기, 입술·볼 근육에 차가운 스푼으로 자극주기 등 구강 탐색놀이를 통해 단계적으로 감각을 높여가세요."], "has_ai": true}];
     const FB = {"apiKey": "AIzaSyDKvgNklNcWXGsibeE1vnVStSYMAfLfX5M", "authDomain": "seoa-b44b4.firebaseapp.com", "databaseURL": "https://seoa-b44b4-default-rtdb.asia-southeast1.firebasedatabase.app", "projectId": "seoa-b44b4", "storageBucket": "seoa-b44b4.firebasestorage.app", "messagingSenderId": "214737228161", "appId": "1:214737228161:web:fe4f733af7ac779a7e5880", "measurementId": "G-30S7S7T6K7"};
-    const CATS = ["인지", "운동", "자조", "언어", "병원", "기타"];
+    const CATS = ["인지", "운동", "자조", "한글", "수영", "수영(학교)", "병원", "기타"];
     const PAGE = 30;
     const TOPIC_ORDER=['유전·진단','성장·발달','신경·인지·행동','종양·감시','합병증·동반질환','치료·관리','기전·기초연구','기타','미분류'];
     const STAGE_ORDER=['리뷰','관찰연구','초기임상','후기임상','전임상','사례보고','기타','미분석'];
@@ -252,7 +264,7 @@
       }).join('');
     }
     // ----- 공유 캘린더 (Firebase) -----
-    const CATCOLOR={'인지':'#5b8def','운동':'#2bb673','자조':'#e8923b','언어':'#9b6fd6','병원':'#e05c5c','기타':'#8a8f99'};
+    const CATCOLOR={'인지':'#5b8def','운동':'#2bb673','자조':'#e8923b','한글':'#9b6fd6','수영':'#16b1c4','수영(학교)':'#0e7c8a','병원':'#e05c5c','기타':'#8a8f99'};
     let fbReady=false, fbAuth=null, fbDB=null, calUser=null, calEvents={}, calMonth=new Date();
     const authListeners=[];
     function calEl(id){return document.getElementById(id);}
@@ -339,6 +351,22 @@
         '<div class="cal-dow">일</div><div class="cal-dow">월</div><div class="cal-dow">화</div><div class="cal-dow">수</div><div class="cal-dow">목</div><div class="cal-dow">금</div><div class="cal-dow">토</div>'+cells;
       // 카테고리 범례
       calEl('cal-legend').innerHTML=CATS.map(c=>`<span class="cal-lg"><i style="background:${CATCOLOR[c]||'#8a8f99'}"></i>${esc(c)}</span>`).join('');
+      // 이 달 일정 상세 목록 (작은 화면에서도 전체 정보 노출)
+      const DOW=['일','월','화','수','목','금','토'];
+      const ym=`${y}-${String(m+1).padStart(2,'0')}`;
+      const monthEvs=Object.keys(calEvents).map(id=>({id,...calEvents[id]}))
+        .filter(e=>String(e.date||'').slice(0,7)===ym)
+        .sort((a,b)=>(a.date+'T'+(a.time||'')).localeCompare(b.date+'T'+(b.time||'')));
+      calEl('cal-agenda').innerHTML = monthEvs.length ? monthEvs.map(e=>{
+        const d=new Date(e.date+'T00:00:00');
+        const md=`${d.getMonth()+1}/${d.getDate()}(${DOW[d.getDay()]})`;
+        return `<div class="ag-row"><span class="ag-dot" style="background:${CATCOLOR[e.cat]||'#8a8f99'}"></span>`+
+          `<div class="ag-main"><div class="ag-l1"><b>${esc(md)}</b>${e.time?' '+esc(e.time):''} <span class="ag-cat">${esc(e.cat||'')}</span>${e.series?' <span class="ag-rep">⟲반복</span>':''}</div>`+
+          `<div class="ag-title">${esc(e.title)}</div>`+
+          (e.memo?`<div class="ag-memo">${esc(e.memo)}</div>`:'')+
+          (e.by?`<div class="ag-by">${esc(e.by)}</div>`:'')+
+          `</div><button class="ag-del" onclick="__delEvent('${e.id}')">삭제</button></div>`;
+      }).join('') : '<p class="muted">이 달 일정이 없습니다.</p>';
     }
     // ----- 질문하기 (자료 근거 RAG 챗봇) -----
     const CHAT_MODEL="claude-haiku-4-5-20251001";
@@ -359,14 +387,17 @@
       calEl('chat-pw').addEventListener('keydown',e=>{if(e.key==='Enter')calEl('chat-login-btn').click();});
       calEl('chat-logout').onclick=()=>fbAuth.signOut();
       calEl('chat-key-save').onclick=saveChatKey;
+      calEl('chat-key-edit').onclick=()=>{calEl('chat-key-box').style.display='flex';};
       calEl('chat-send').onclick=sendChat;
       calEl('chat-input').addEventListener('keydown',e=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendChat(); }});
     }
     function loadChatKey(){
       fbDB.ref('secure/anthropicKey').once('value').then(s=>{
         chatKey=s.val()||"";
-        calEl('chat-key-status').textContent = chatKey? '✅ API 키 등록됨' : '⚠ API 키 미등록 — 아래에 입력해 저장하세요';
-        calEl('chat-key-box').style.display = chatKey? 'none':'block';
+        const last4=chatKey?chatKey.slice(-4):'';
+        calEl('chat-key-status').textContent = chatKey? `✅ API 키 등록됨 (••••${last4})` : '⚠ API 키 미등록 — 아래에 입력해 저장하세요';
+        calEl('chat-key-box').style.display = chatKey? 'none':'flex';
+        calEl('chat-key-edit').style.display = chatKey? 'inline':'none';
       }).catch(e=>{ calEl('chat-key-status').textContent='키 확인 오류(보안 규칙 확인): '+e.message; });
     }
     function saveChatKey(){

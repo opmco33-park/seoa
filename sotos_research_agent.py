@@ -44,14 +44,7 @@ import xml.etree.ElementTree as ET
 # 1. 설정 (CONFIG)  -- 여기만 고치면 됩니다
 # ==========================================================================
 CONFIG = {
-    # --- 추적 대상 ---
-    "pubmed_query": '("Sotos syndrome"[Title/Abstract] OR "NSD1"[Title/Abstract])',
-    "ctgov_condition": "Sotos syndrome",
-    "ctgov_term": "NSD1",
-
-    # --- 수집 범위 ---
-    "lookback_days": 30,            # 평소(증분) 모드: 최근 30일이면 매일 돌릴 때 충분
-    "backfill_lookback_days": 7300,  # --backfill 모드: ≈20년 전체
+    # --- 수집 범위 (전역) ---
     "pubmed_max": 2000,
     "ctgov_max": 200,
 
@@ -73,10 +66,35 @@ CONFIG = {
     "ncbi_api_key": "",
 
     # --- 사이트 ---
-    "site_title": "Sotos / NSD1 연구 추적",
+    "site_title": "서아 통합 연구·케어",
     "data_dir": "data",
     "docs_dir": "docs",   # GitHub Pages 발행 폴더 (index.html)
 }
+
+# 연구 '영역(domain)'별 검색 스트림. 영역을 추가/수정하려면 여기만 고치면 됩니다.
+#  - lookback_days: 평소(증분) 수집 범위 / backfill_lookback_days: 최초 전체 수집 범위
+#  - 발달치료는 연구량이 매우 많으므로 범위를 좁히고(3년) 질의를 소아·실용 중심으로 한정
+STREAMS = [
+    {
+        "id": "sotos", "label": "Sotos 연구",
+        "pubmed_query": '("Sotos syndrome"[Title/Abstract] OR "NSD1"[Title/Abstract])',
+        "ctgov_condition": "Sotos syndrome", "ctgov_term": "NSD1",
+        "lookback_days": 30, "backfill_lookback_days": 7300,   # ≈20년
+    },
+    {
+        "id": "therapy", "label": "발달치료 연구",
+        "pubmed_query": ('(("developmental delay"[Title/Abstract] OR "developmental disability"[Title/Abstract] '
+                         'OR "intellectual disability"[Title/Abstract]) '
+                         'AND ("occupational therapy"[Title/Abstract] OR "self-care"[Title/Abstract] '
+                         'OR "activities of daily living"[Title/Abstract] OR "early intervention"[Title/Abstract] '
+                         'OR "cognitive intervention"[Title/Abstract] OR "motor intervention"[Title/Abstract]) '
+                         'AND ("child"[Title/Abstract] OR "children"[Title/Abstract] OR "pediatric"[Title/Abstract]))'),
+        "ctgov_condition": "developmental delay", "ctgov_term": "rehabilitation",
+        "lookback_days": 30, "backfill_lookback_days": 1095,    # ≈3년 (양이 많아 범위 한정)
+    },
+]
+# 대시보드 영역 라벨 (id -> 표시명)
+DOMAIN_LABELS = {s["id"]: s["label"] for s in STREAMS}
 
 BASE = Path(__file__).resolve().parent
 DATA_DIR = BASE / CONFIG["data_dir"]
@@ -151,17 +169,17 @@ def _ncbi_common_params() -> dict:
     return p
 
 
-def count_pubmed() -> int:
-    params = {"db": "pubmed", "term": CONFIG["pubmed_query"], "retmax": 0,
+def count_pubmed(query: str, lookback_days: int) -> int:
+    params = {"db": "pubmed", "term": query, "retmax": 0,
               "retmode": "json", "datetype": "pdat",
-              "reldate": CONFIG["backfill_lookback_days"], **_ncbi_common_params()}
+              "reldate": lookback_days, **_ncbi_common_params()}
     r = requests.get(f"{EUTILS}/esearch.fcgi", params=params, timeout=30)
     r.raise_for_status()
     return int(r.json().get("esearchresult", {}).get("count", 0))
 
 
-def count_trials() -> int:
-    params = {"query.cond": CONFIG["ctgov_condition"], "query.term": CONFIG["ctgov_term"],
+def count_trials(cond: str, term: str) -> int:
+    params = {"query.cond": cond, "query.term": term,
               "countTotal": "true", "pageSize": 1, "format": "json"}
     r = requests.get(CTGOV, params=params, timeout=30)
     r.raise_for_status()
@@ -171,8 +189,8 @@ def count_trials() -> int:
 # ==========================================================================
 # 4. 데이터 수집
 # ==========================================================================
-def fetch_pubmed(lookback_days: int) -> list:
-    search_params = {"db": "pubmed", "term": CONFIG["pubmed_query"],
+def fetch_pubmed(query: str, lookback_days: int) -> list:
+    search_params = {"db": "pubmed", "term": query,
                      "retmax": CONFIG["pubmed_max"], "retmode": "json",
                      "datetype": "pdat", "reldate": lookback_days,
                      "sort": "pub_date", **_ncbi_common_params()}
@@ -221,8 +239,8 @@ def _parse_pubmed_xml(xml_text: str) -> list:
     return items
 
 
-def fetch_trials(lookback_days: int) -> list:
-    params = {"query.cond": CONFIG["ctgov_condition"], "query.term": CONFIG["ctgov_term"],
+def fetch_trials(cond: str, term: str, lookback_days: int) -> list:
+    params = {"query.cond": cond, "query.term": term,
               "pageSize": CONFIG["ctgov_max"], "format": "json"}
     r = requests.get(CTGOV, params=params, timeout=30)
     r.raise_for_status()
@@ -396,6 +414,7 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime)
         slim.append({
             "type": it["type"], "id": it["id"], "title": it.get("title", ""),
             "url": it.get("url", ""), "date": str(it.get("date", "")),
+            "domain": it.get("domain", "sotos"),
             "meta": it.get("meta", {}),
             "summary": ai.get("summary_3lines", ""),
             "stage": ai.get("study_stage", ""),
@@ -467,7 +486,12 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime)
     .qbox{background:var(--soft);border-radius:8px;padding:9px 13px;font-size:.86rem}
     .qbox ul{margin:4px 0 0;padding-left:17px}
     .muted{color:var(--muted)}
-    .axis{display:flex;margin:20px 0 6px}
+    .domains{display:flex;gap:7px;flex-wrap:wrap;margin:18px 0 4px}
+    .dombtn{font-family:inherit;font-size:.86rem;font-weight:500;padding:8px 15px;border:1px solid var(--line);background:#fff;border-radius:9px;cursor:pointer;color:var(--ink)}
+    .dombtn:hover{border-color:var(--accent)}
+    .dombtn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+    .dombtn .n{opacity:.65;font-size:.78rem;margin-left:2px}
+    .axis{display:flex;margin:10px 0 6px}
     .axbtn{font-family:inherit;font-size:.82rem;padding:6px 16px;border:1px solid var(--line);background:#fff;cursor:pointer;color:var(--muted)}
     .axbtn:first-child{border-radius:9px 0 0 9px}
     .axbtn:last-child{border-radius:0 9px 9px 0;border-left:none}
@@ -484,19 +508,23 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime)
 
     js = """
     const ITEMS = __DATA__;
+    const DOMAINS = __DOMAINS__;
     const PAGE = 30;
     const TOPIC_ORDER=['유전·진단','성장·발달','신경·인지·행동','종양·감시','합병증·동반질환','치료·관리','기전·기초연구','기타','미분류'];
     const STAGE_ORDER=['리뷰','관찰연구','초기임상','후기임상','전임상','사례보고','기타','미분석'];
-    let axis='topic', tabVal='전체', typeF='all', yearF='all', shown=PAGE;
+    let domainF='all', axis='topic', tabVal='전체', typeF='all', yearF='all', shown=PAGE;
     const listEl=document.getElementById('list');
     const countEl=document.getElementById('countbar');
     const tabsEl=document.getElementById('tabs');
     const axisEl=document.getElementById('axis');
+    const domainsEl=document.getElementById('domains');
     const qEl=document.getElementById('q');
     const typeEl=document.getElementById('type');
     const yearEl=document.getElementById('year');
     const moreEl=document.getElementById('more');
     function esc(s){const d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML;}
+    function domainOf(it){return it.domain||'sotos';}
+    function inDomain(it){return domainF==='all'||domainOf(it)===domainF;}
     function stageOf(it){return it.has_ai && it.stage ? it.stage : '미분석';}
     function topicOf(it){return it.has_ai && it.topic ? it.topic : '미분류';}
     function keyOf(it){return axis==='topic' ? topicOf(it) : stageOf(it);}
@@ -511,12 +539,21 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime)
       axisEl.querySelectorAll('.axbtn').forEach(b=>b.onclick=()=>{
         axis=b.dataset.a; tabVal='전체'; shown=PAGE; buildAxis(); buildTabs(); render();});
     }
+    function buildDomains(){
+      const counts={}; ITEMS.forEach(it=>{const d=domainOf(it);counts[d]=(counts[d]||0)+1;});
+      let h=`<button class="dombtn${domainF==='all'?' active':''}" data-d="all">전체 영역 <span class="n">${ITEMS.length}</span></button>`;
+      h+=Object.keys(DOMAINS).map(d=>`<button class="dombtn${domainF===d?' active':''}" data-d="${esc(d)}">${esc(DOMAINS[d])} <span class="n">${counts[d]||0}</span></button>`).join('');
+      domainsEl.innerHTML=h;
+      domainsEl.querySelectorAll('.dombtn').forEach(b=>b.onclick=()=>{
+        domainF=b.dataset.d; tabVal='전체'; shown=PAGE; buildDomains(); buildTabs(); render();});
+    }
     function buildTabs(){
-      const counts={}; ITEMS.forEach(it=>{const k=keyOf(it);counts[k]=(counts[k]||0)+1;});
+      const pool=ITEMS.filter(inDomain);
+      const counts={}; pool.forEach(it=>{const k=keyOf(it);counts[k]=(counts[k]||0)+1;});
       const order=orderFor();
       const keys=Object.keys(counts).sort((a,b)=>{
         const ia=order.indexOf(a),ib=order.indexOf(b);return (ia<0?99:ia)-(ib<0?99:ib);});
-      let h=`<button class="tab${tabVal==='전체'?' active':''}" data-v="전체">전체 <span class="n">${ITEMS.length}</span></button>`;
+      let h=`<button class="tab${tabVal==='전체'?' active':''}" data-v="전체">전체 <span class="n">${pool.length}</span></button>`;
       h+=keys.map(k=>`<button class="tab${tabVal===k?' active':''}" data-v="${esc(k)}">${esc(k)} <span class="n">${counts[k]}</span></button>`).join('');
       tabsEl.innerHTML=h;
       tabsEl.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{tabVal=b.dataset.v;shown=PAGE;buildTabs();render();});
@@ -544,6 +581,7 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime)
     function filtered(){
       const q=qEl.value.trim().toLowerCase();
       return ITEMS.filter(it=>{
+        if(!inDomain(it)) return false;
         if(tabVal!=='전체' && keyOf(it)!==tabVal) return false;
         if(typeF!=='all' && it.type!==typeF) return false;
         if(yearF!=='all' && yearOf(it)!==yearF) return false;
@@ -563,11 +601,12 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime)
     typeEl.addEventListener('change',()=>{typeF=typeEl.value;shown=PAGE;render();});
     yearEl.addEventListener('change',()=>{yearF=yearEl.value;shown=PAGE;render();});
     moreEl.addEventListener('click',()=>{shown+=PAGE;render();});
+    buildDomains();
     buildAxis();
     buildTabs();
     render();
     """
-    js = js.replace("__DATA__", data_json)
+    js = js.replace("__DATA__", data_json).replace("__DOMAINS__", json.dumps(DOMAIN_LABELS, ensure_ascii=False))
 
     return (
         "<!DOCTYPE html><html lang='ko'><head><meta charset='utf-8'>"
@@ -581,6 +620,7 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime)
         "<div class='disclaimer'><b>읽기 전에.</b> 검색·정리를 돕는 도구가 만든 자료입니다. "
         "요약·분석은 부정확할 수 있으며 진단·치료 판단이 아닙니다. <b>모든 내용은 원문과 담당 의료진을 통해 확인</b>하세요.</div>"
         f"{synth_html}"
+        "<div class='domains' id='domains'></div>"
         "<div class='axis' id='axis'></div>"
         "<div class='tabs' id='tabs'></div>"
         "<div class='controls'><input id='q' placeholder='검색어 (제목·요약 내)'>"
@@ -604,13 +644,19 @@ DEMO_ITEMS = [
      "raw_text": "Sample abstract for offline preview.",
      "ai": {"summary_3lines": "샘플 요약입니다.", "study_stage": "사례보고",
             "relevance": "오프라인 미리보기용 예시입니다.",
-            "questions_for_doctor": ["이 변이 유형이 우리 아이와 관련 있나요?"], "topic": "유전·진단"}},
+            "questions_for_doctor": ["이 변이 유형이 우리 아이와 관련 있나요?"], "topic": "유전·진단"}, "domain": "sotos"},
     {"type": "trial", "id": "NCTDEMO", "title": "Sample: Growth patterns in Sotos syndrome",
      "url": "https://clinicaltrials.gov/", "date": "2026-05-01",
      "meta": {"status": "RECRUITING", "phase": "N/A", "conditions": "Sotos Syndrome"},
      "raw_text": "Sample summary.",
      "ai": {"summary_3lines": "샘플 임상시험 요약.", "study_stage": "관찰연구",
-            "relevance": "예시.", "questions_for_doctor": ["참여 조건이 궁금합니다."], "topic": "성장·발달"}},
+            "relevance": "예시.", "questions_for_doctor": ["참여 조건이 궁금합니다."], "topic": "성장·발달"}, "domain": "sotos"},
+    {"type": "pubmed", "id": "DEMO3", "title": "Sample: Occupational therapy for self-care in developmental delay",
+     "url": "https://pubmed.ncbi.nlm.nih.gov/", "date": "2025",
+     "meta": {"journal": "Demo Peds Journal", "authors": "Kim SA et al."},
+     "raw_text": "Sample therapy abstract.",
+     "ai": {"summary_3lines": "샘플 발달치료 요약.", "study_stage": "관찰연구",
+            "relevance": "자조기술 훈련 관련 예시.", "questions_for_doctor": ["가정에서 적용할 수 있나요?"], "topic": "치료·관리"}, "domain": "therapy"},
 ]
 DEMO_SYNTH = {"overview": "이것은 오프라인 미리보기용 샘플 종합 분석입니다.",
               "themes": [{"title": "유전형-표현형", "detail": "샘플 주제 설명."},
@@ -625,15 +671,18 @@ def main():
     # ----- 건수만 -----
     if "--count" in sys.argv:
         log("건수만 확인 (수집·요약·비용 없음)…")
-        try: n_pub = count_pubmed()
-        except Exception as e: n_pub = None; log(f"  PubMed 실패: {e}")
-        try: n_trial = count_trials()
-        except Exception as e: n_trial = None; log(f"  ClinicalTrials 실패: {e}")
-        print("\n===== 전체 건수 (최근 20년) =====")
-        print(f"  PubMed 논문    : {n_pub if n_pub is not None else '실패'} 건")
-        print(f"  ClinicalTrials : {n_trial if n_trial is not None else '실패'} 건")
-        if n_pub is not None and n_trial is not None:
-            print(f"  합계           : 약 {n_pub + n_trial} 건")
+        total = 0
+        print("\n===== 영역별 전체 건수 =====")
+        for st in STREAMS:
+            try: n_pub = count_pubmed(st["pubmed_query"], st["backfill_lookback_days"])
+            except Exception as e: n_pub = None; log(f"  [{st['label']}] PubMed 실패: {e}")
+            try: n_trial = count_trials(st["ctgov_condition"], st["ctgov_term"])
+            except Exception as e: n_trial = None; log(f"  [{st['label']}] ClinicalTrials 실패: {e}")
+            print(f"  [{st['label']}] 논문 {n_pub if n_pub is not None else '실패'} · "
+                  f"임상 {n_trial if n_trial is not None else '실패'}")
+            if isinstance(n_pub, int): total += n_pub
+            if isinstance(n_trial, int): total += n_trial
+        print(f"  합계: 약 {total} 건")
         return
 
     DOCS_DIR.mkdir(parents=True, exist_ok=True)
@@ -679,21 +728,30 @@ def main():
         return
 
     backfill = "--backfill" in sys.argv
-    lookback = CONFIG["backfill_lookback_days"] if backfill else CONFIG["lookback_days"]
     api_key = os.environ.get("ANTHROPIC_API_KEY", "")
     use_ai = CONFIG["use_ai_summary"] and bool(api_key)
     if backfill:
-        log("BACKFILL 모드: 과거 20년치 전체를 분석합니다 (시간·비용이 한 번에 발생).")
+        log("BACKFILL 모드: 각 영역의 전체 범위를 분석합니다 (시간·비용이 한 번에 발생).")
 
-    # --- 수집 ---
+    # --- 수집 (영역별 스트림 반복) ---
     seen = load_seen()
-    log("PubMed 수집 중…")
-    pubmed = fetch_pubmed(lookback)
-    log("ClinicalTrials.gov 수집 중…")
-    trials = fetch_trials(lookback)
-    new_pubmed = [i for i in pubmed if i["id"] not in set(seen["pmids"])]
-    new_trials = [i for i in trials if i["id"] not in set(seen["ncts"])]
-    all_new = new_pubmed + new_trials
+    seen_pmids, seen_ncts = set(seen["pmids"]), set(seen["ncts"])
+    added = set()           # 이번 실행에서 이미 담은 id (영역 간 중복 방지)
+    all_new = []
+    for st in STREAMS:
+        lb = st["backfill_lookback_days"] if backfill else st["lookback_days"]
+        log(f"[{st['label']}] PubMed 수집 중…")
+        for it in fetch_pubmed(st["pubmed_query"], lb):
+            if it["id"] in seen_pmids or it["id"] in added:
+                continue
+            it["domain"] = st["id"]; all_new.append(it); added.add(it["id"])
+        log(f"[{st['label']}] ClinicalTrials.gov 수집 중…")
+        for it in fetch_trials(st["ctgov_condition"], st["ctgov_term"], lb):
+            if it["id"] in seen_ncts or it["id"] in added:
+                continue
+            it["domain"] = st["id"]; all_new.append(it); added.add(it["id"])
+    new_pubmed = [i for i in all_new if i["type"] == "pubmed"]
+    new_trials = [i for i in all_new if i["type"] == "trial"]
     log(f"신규 항목: 논문 {len(new_pubmed)} · 임상시험 {len(new_trials)}")
 
     # --- 처리 대상 결정 (백필=전부 / 평소=상한) ---

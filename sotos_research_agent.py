@@ -1399,6 +1399,23 @@ def main():
         log(f"대시보드 재발행 → {INDEX_PATH}")
         return
 
+    # ----- 종합분석만 강제 재생성 (신규 없어도 전체 데이터로 다시 분석) -----
+    if "--resynth" in sys.argv:
+        api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+        if not api_key:
+            log("ANTHROPIC_API_KEY가 없어 종합분석을 만들 수 없습니다."); return
+        items = load_kb()
+        if not items:
+            log("분석할 항목이 없습니다 (먼저 수집/백필 필요)."); return
+        log(f"종합분석 강제 재생성: 전체 {len(items)}건 기반…")
+        new_synth = synthesize(items, api_key)
+        if new_synth:
+            SYNTH_PATH.write_text(json.dumps(new_synth, ensure_ascii=False, indent=2), encoding="utf-8")
+            log(f"종합분석 갱신 완료 (용어풀이 {len(new_synth.get('glossary', []))}개).")
+        INDEX_PATH.write_text(render_dashboard(items, new_synth, run_time, load_resources()), encoding="utf-8")
+        log(f"대시보드 재발행 → {INDEX_PATH}")
+        return
+
     # ----- 기존 항목 주제 분류 (일회성) -----
     if "--retag" in sys.argv:
         api_key = os.environ.get("ANTHROPIC_API_KEY", "")
@@ -1504,7 +1521,9 @@ def main():
     if SYNTH_PATH.exists():
         try: synth = json.loads(SYNTH_PATH.read_text(encoding="utf-8"))
         except Exception: synth = None
-    need_synth = CONFIG["synthesis_enabled"] and use_ai and (backfill or to_process or synth is None)
+    need_synth = CONFIG["synthesis_enabled"] and use_ai and (
+        backfill or to_process or synth is None
+        or (isinstance(synth, dict) and not synth.get("glossary")))   # 각주 없는 옛 종합분석이면 자동 갱신
     if need_synth and all_items:
         new_synth = synthesize(all_items, api_key)
         if new_synth:

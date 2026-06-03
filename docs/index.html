@@ -92,7 +92,7 @@
     .cal-del{border:none;background:rgba(0,0,0,.18);color:#fff;border-radius:4px;cursor:pointer;font-size:.7rem;line-height:1;padding:1px 4px}
     @media(max-width:640px){.cal-cell{min-height:62px}.cal-ev{font-size:.66rem}}
     .cal-agenda-h{font-family:'Lora',serif;font-size:1.05rem;margin:22px 0 8px}
-    .cal-agenda .ag-row{display:flex;gap:10px;align-items:flex-start;background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:7px}
+    .ev-row{display:flex;gap:10px;align-items:flex-start;background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:7px}
     .ag-dot{flex:0 0 auto;width:12px;height:12px;border-radius:50%;margin-top:5px}
     .ag-main{flex:1;min-width:0}
     .ag-l1{font-size:.86rem;color:var(--muted)}
@@ -101,8 +101,20 @@
     .ag-title{font-weight:600;font-size:1rem;margin:2px 0;word-break:break-word}
     .ag-memo{font-size:.9rem;color:var(--ink);word-break:break-word;white-space:pre-wrap}
     .ag-by{font-size:.74rem;color:var(--muted);margin-top:2px}
-    .ag-del{flex:0 0 auto;border:1px solid var(--line);background:#fff;color:var(--muted);border-radius:7px;padding:4px 9px;font-size:.78rem;cursor:pointer;font-family:inherit}
+    .ev-btns{flex:0 0 auto;display:flex;flex-direction:column;gap:4px}
+    .ag-del,.ag-edit{border:1px solid var(--line);background:#fff;color:var(--muted);border-radius:7px;padding:4px 9px;font-size:.78rem;cursor:pointer;font-family:inherit}
+    .ag-edit:hover{border-color:var(--accent);color:var(--accent)}
     .ag-del:hover{border-color:#e05c5c;color:#e05c5c}
+    .cal-viewtoggle{display:inline-flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;margin:10px 0}
+    .vbtn{font-family:inherit;font-size:.86rem;padding:7px 16px;border:none;background:#fff;cursor:pointer;color:var(--muted)}
+    .vbtn.active{background:var(--accent);color:#fff}
+    .cal-week{display:flex;flex-direction:column;gap:8px;margin-top:6px}
+    .wk-day{border:1px solid var(--line);border-radius:10px;padding:8px 10px;background:var(--bg)}
+    .wk-today{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+    .wk-dhead{font-weight:600;font-size:.92rem;margin-bottom:6px;color:var(--ink)}
+    .wk-empty{font-size:.82rem;color:var(--muted)}
+    .cal-week .ev-row{margin-bottom:6px}
+    .cal-ev{cursor:pointer}
     .domains{display:flex;gap:7px;flex-wrap:wrap;margin:18px 0 4px}
     .dombtn{font-family:inherit;font-size:.86rem;font-weight:500;padding:8px 15px;border:1px solid var(--line);background:#fff;border-radius:9px;cursor:pointer;color:var(--ink)}
     .dombtn:hover{border-color:var(--accent)}
@@ -121,7 +133,7 @@
     .more-btn{display:block;width:100%;margin-top:10px;padding:12px;border:1px dashed var(--line);background:#fff;border-radius:10px;cursor:pointer;font-family:inherit;font-size:.9rem;color:var(--accent)}
     .more-btn:hover{border-color:var(--accent);background:var(--soft)}
     footer{margin-top:46px;padding-top:18px;border-top:1px solid var(--line);color:var(--muted);font-size:.78rem}
-    </style></head><body><div class='wrap'><h1>서아 통합 연구·케어</h1><p class='sub'>마지막 갱신 2026-06-03 10:40 · 논문 936 · 임상시험 30</p><div class='disclaimer'><b>읽기 전에.</b> 검색·정리를 돕는 도구가 만든 자료입니다. 요약·분석은 부정확할 수 있으며 진단·치료 판단이 아닙니다. <b>모든 내용은 원문과 담당 의료진을 통해 확인</b>하세요.</div><div class='sections' id='sections'></div><div id='sec-calendar'><div id='cal-setup' style='display:none' class='cal-setup'><b>공유 캘린더를 쓰려면 Firebase 설정이 필요합니다.</b><br>스크립트 CONFIG의 <code>firebase_config</code>에 Firebase 웹 앱 설정을 넣고, Realtime Database 보안 규칙으로 두 분만 접근하도록 잠그세요. 자세한 절차는 대화의 안내를 참고하세요.</div><div id='cal-login' style='display:none' class='cal-login'><h3>로그인</h3><p class='muted'>두 분만 접근할 수 있는 비공개 일정입니다.</p><input id='cal-email' type='email' placeholder='이메일' autocomplete='username'><input id='cal-pw' type='password' placeholder='비밀번호' autocomplete='current-password'><button id='cal-login-btn' class='cal-btn'>로그인</button><div id='cal-err' class='cal-err'></div></div><div id='cal-app' style='display:none'><div class='cal-bar'><span class='muted'>로그인: <b id='cal-who'></b></span><button id='cal-logout' class='cal-link'>로그아웃</button></div><div class='cal-form'><input id='cal-date' type='date'><input id='cal-time' type='time'><select id='cal-cat'></select><input id='cal-title' placeholder='일정 (예: 인지치료)'><input id='cal-memo' placeholder='메모 (선택)'><span class='cal-rep-lbl'>매주 반복 종료일</span><input id='cal-until' type='date' title='이 날짜까지 매주 같은 요일에 반복 (선택)'><button id='cal-add' class='cal-btn'>추가</button></div><div id='cal-legend' class='cal-legend'></div><div class='cal-nav'><button id='cal-prev' class='cal-link'>‹ 이전</button><b id='cal-label'></b><button id='cal-next' class='cal-link'>다음 ›</button></div><div id='cal-grid' class='cal-grid'></div><div class='cal-agenda-h'>이 달 일정</div><div id='cal-agenda' class='cal-agenda'></div></div></div><button id='chat-fab' class='chat-fab' aria-label='질문하기' title='질문하기'>💬</button><div id='chat-panel' class='chat-panel' style='display:none'><div class='chat-panel-head'><b>질문하기</b><button id='chat-close' class='chat-close' aria-label='닫기'>×</button></div><div class='chat-body'><div id='chat-setup' style='display:none' class='cal-setup'><b>질문하기를 쓰려면 Firebase 설정이 필요합니다.</b> 캘린더와 동일한 설정을 사용합니다.</div><div id='chat-login' style='display:none' class='cal-login'><h3>로그인</h3><p class='muted'>두 분만 사용할 수 있습니다.</p><input id='chat-email' type='email' placeholder='이메일' autocomplete='username'><input id='chat-pw' type='password' placeholder='비밀번호' autocomplete='current-password'><button id='chat-login-btn' class='cal-btn'>로그인</button><div id='chat-err' class='cal-err'></div></div><div id='chat-app' style='display:none'><div class='cal-bar'><span id='chat-key-status' class='muted'></span><span><button id='chat-key-edit' class='cal-link' style='display:none'>키 변경</button> <button id='chat-logout' class='cal-link'>로그아웃</button></span></div><div id='chat-key-box' style='display:none' class='chat-keybox'><input id='chat-key-input' type='password' placeholder='Anthropic API 키 (sk-ant-...)'><button id='chat-key-save' class='cal-btn'>키 저장</button><p class='muted' style='font-size:.78rem;margin:6px 0 0'>키는 Firebase에 저장되어 로그인한 두 분만 사용합니다. Anthropic 콘솔에서 월 사용 한도를 걸어두길 권합니다.</p></div><div id='chat-log' class='chat-log'></div><div class='chat-inputbar'><textarea id='chat-input' rows='2' placeholder='질문 (예: 소토스 아동의 성장에 대해 알려줘)'></textarea><button id='chat-send' class='cal-btn'>보내기</button></div><p class='muted' style='font-size:.74rem;margin-top:6px'>답변은 모은 자료(논문·임상·국내자료)에 근거합니다. 의학적 판단은 담당 의료진과 상의하세요.</p></div></div></div><div id='sec-research' style='display:none'><div class='domains' id='domains'></div><div id='paper-view'><div class='axis' id='axis'></div><div class='tabs' id='tabs'></div><div class='controls'><input id='q' placeholder='검색어 (제목·요약 내)'><select id='type'><option value='all'>전체 종류</option><option value='pubmed'>논문</option><option value='trial'>임상시험</option></select><select id='year'></select></div><div class='countbar' id='countbar'></div><div id='list'></div><button class='more-btn' id='more' style='display:none'></button></div><div id='res-view' style='display:none'><p class='res-intro'>국내 공식 사이트에서 robots.txt를 지키며 모은 실용 자료입니다. 원문 확인은 각 링크에서.</p><div id='reslist'></div></div></div><div id='sec-synthesis' style='display:none'>
+    </style></head><body><div class='wrap'><h1>서아 통합 연구·케어</h1><p class='sub'>마지막 갱신 2026-06-03 12:43 · 논문 936 · 임상시험 30</p><div class='disclaimer'><b>읽기 전에.</b> 검색·정리를 돕는 도구가 만든 자료입니다. 요약·분석은 부정확할 수 있으며 진단·치료 판단이 아닙니다. <b>모든 내용은 원문과 담당 의료진을 통해 확인</b>하세요.</div><div class='sections' id='sections'></div><div id='sec-calendar'><div id='cal-setup' style='display:none' class='cal-setup'><b>공유 캘린더를 쓰려면 Firebase 설정이 필요합니다.</b><br>스크립트 CONFIG의 <code>firebase_config</code>에 Firebase 웹 앱 설정을 넣고, Realtime Database 보안 규칙으로 두 분만 접근하도록 잠그세요. 자세한 절차는 대화의 안내를 참고하세요.</div><div id='cal-login' style='display:none' class='cal-login'><h3>로그인</h3><p class='muted'>두 분만 접근할 수 있는 비공개 일정입니다.</p><input id='cal-email' type='email' placeholder='이메일' autocomplete='username'><input id='cal-pw' type='password' placeholder='비밀번호' autocomplete='current-password'><button id='cal-login-btn' class='cal-btn'>로그인</button><div id='cal-err' class='cal-err'></div></div><div id='cal-app' style='display:none'><div class='cal-bar'><span class='muted'>로그인: <b id='cal-who'></b></span><button id='cal-logout' class='cal-link'>로그아웃</button></div><div class='cal-form'><input id='cal-date' type='date'><input id='cal-time' type='time'><select id='cal-cat'></select><input id='cal-title' placeholder='일정 (예: 인지치료)'><input id='cal-memo' placeholder='메모 (선택)'><span class='cal-rep-lbl'>매주 반복 종료일</span><input id='cal-until' type='date' title='이 날짜까지 매주 같은 요일에 반복 (선택)'><button id='cal-add' class='cal-btn'>추가</button><button id='cal-cancel' class='cal-link' style='display:none'>취소</button></div><div id='cal-legend' class='cal-legend'></div><div class='cal-viewtoggle'><button id='cal-view-week' class='vbtn active'>주간</button><button id='cal-view-month' class='vbtn'>월간</button></div><div class='cal-nav'><button id='cal-prev' class='cal-link'>‹ 이전</button><b id='cal-label'></b><button id='cal-next' class='cal-link'>다음 ›</button></div><div id='cal-week' class='cal-week'></div><div id='cal-grid' class='cal-grid' style='display:none'></div><div id='cal-agenda-h' class='cal-agenda-h' style='display:none'>이 달 일정</div><div id='cal-agenda' class='cal-agenda' style='display:none'></div></div></div><button id='chat-fab' class='chat-fab' aria-label='질문하기' title='질문하기'>💬</button><div id='chat-panel' class='chat-panel' style='display:none'><div class='chat-panel-head'><b>질문하기</b><button id='chat-close' class='chat-close' aria-label='닫기'>×</button></div><div class='chat-body'><div id='chat-setup' style='display:none' class='cal-setup'><b>질문하기를 쓰려면 Firebase 설정이 필요합니다.</b> 캘린더와 동일한 설정을 사용합니다.</div><div id='chat-login' style='display:none' class='cal-login'><h3>로그인</h3><p class='muted'>두 분만 사용할 수 있습니다.</p><input id='chat-email' type='email' placeholder='이메일' autocomplete='username'><input id='chat-pw' type='password' placeholder='비밀번호' autocomplete='current-password'><button id='chat-login-btn' class='cal-btn'>로그인</button><div id='chat-err' class='cal-err'></div></div><div id='chat-app' style='display:none'><div class='cal-bar'><span id='chat-key-status' class='muted'></span><span><button id='chat-key-edit' class='cal-link' style='display:none'>키 변경</button> <button id='chat-logout' class='cal-link'>로그아웃</button></span></div><div id='chat-key-box' style='display:none' class='chat-keybox'><input id='chat-key-input' type='password' placeholder='Anthropic API 키 (sk-ant-...)'><button id='chat-key-save' class='cal-btn'>키 저장</button><p class='muted' style='font-size:.78rem;margin:6px 0 0'>키는 Firebase에 저장되어 로그인한 두 분만 사용합니다. Anthropic 콘솔에서 월 사용 한도를 걸어두길 권합니다.</p></div><div id='chat-log' class='chat-log'></div><div class='chat-inputbar'><textarea id='chat-input' rows='2' placeholder='질문 (예: 소토스 아동의 성장에 대해 알려줘)'></textarea><button id='chat-send' class='cal-btn'>보내기</button></div><p class='muted' style='font-size:.74rem;margin-top:6px'>답변은 모은 자료(논문·임상·국내자료)에 근거합니다. 의학적 판단은 담당 의료진과 상의하세요.</p></div></div></div><div id='sec-research' style='display:none'><div class='domains' id='domains'></div><div id='paper-view'><div class='axis' id='axis'></div><div class='tabs' id='tabs'></div><div class='controls'><input id='q' placeholder='검색어 (제목·요약 내)'><select id='type'><option value='all'>전체 종류</option><option value='pubmed'>논문</option><option value='trial'>임상시험</option></select><select id='year'></select></div><div class='countbar' id='countbar'></div><div id='list'></div><button class='more-btn' id='more' style='display:none'></button></div><div id='res-view' style='display:none'><p class='res-intro'>국내 공식 사이트에서 robots.txt를 지키며 모은 실용 자료입니다. 원문 확인은 각 링크에서.</p><div id='reslist'></div></div></div><div id='sec-synthesis' style='display:none'>
         <section class="synthesis">
           <div class="synth-head">종합 분석 <span class="synth-meta">전체 37건 기반 · 2026-06-03 자동 갱신</span></div>
           <p class="synth-overview">NSD1은 히스톤 메틸화효소로서 Sotos 증후군의 주요 원인유전자이면서, 소아 급성백혈병(특히 NUP98::NSD1 융합)의 핵심 암유전자로 작용합니다. 최근 연구는 발달 이상과 암 발생 양쪽 경로에서 NSD1의 역할을 규명하고 있으며, 진단 기술과 치료 표적 개발이 진행 중입니다.</p>
@@ -265,7 +277,7 @@
     }
     // ----- 공유 캘린더 (Firebase) -----
     const CATCOLOR={'인지':'#5b8def','운동':'#2bb673','자조':'#e8923b','한글':'#9b6fd6','수영':'#16b1c4','수영(학교)':'#0e7c8a','병원':'#e05c5c','기타':'#8a8f99'};
-    let fbReady=false, fbAuth=null, fbDB=null, calUser=null, calEvents={}, calMonth=new Date();
+    let fbReady=false, fbAuth=null, fbDB=null, calUser=null, calEvents={}, calCursor=new Date(), calView='week', editId=null;
     const authListeners=[];
     function calEl(id){return document.getElementById(id);}
     function ensureFirebase(){
@@ -294,8 +306,12 @@
       calEl('cal-login-btn').onclick=()=>fbLogin('cal-email','cal-pw','cal-err');
       calEl('cal-pw').addEventListener('keydown',e=>{if(e.key==='Enter')calEl('cal-login-btn').click();});
       calEl('cal-logout').onclick=()=>fbAuth.signOut();
-      calEl('cal-prev').onclick=()=>{calMonth.setMonth(calMonth.getMonth()-1);renderCal();};
-      calEl('cal-next').onclick=()=>{calMonth.setMonth(calMonth.getMonth()+1);renderCal();};
+      function stepCal(dir){ if(calView==='week') calCursor.setDate(calCursor.getDate()+7*dir); else calCursor.setMonth(calCursor.getMonth()+dir); renderCal(); }
+      calEl('cal-prev').onclick=()=>stepCal(-1);
+      calEl('cal-next').onclick=()=>stepCal(1);
+      calEl('cal-view-week').onclick=()=>setCalView('week');
+      calEl('cal-view-month').onclick=()=>setCalView('month');
+      calEl('cal-cancel').onclick=cancelEdit;
       calEl('cal-add').onclick=addEventFromForm;
     }
     function buildCatOptions(){
@@ -305,9 +321,20 @@
       fbDB.ref('calendar/events').on('value',snap=>{calEvents=snap.val()||{};renderCal();},
         err=>{calEl('cal-app').insertAdjacentHTML('afterbegin','<p class="muted">읽기 권한 오류(보안 규칙 확인): '+esc(err.message)+'</p>');});
     }
+    function setCalView(v){
+      calView=v;
+      calEl('cal-view-week').classList.toggle('active', v==='week');
+      calEl('cal-view-month').classList.toggle('active', v==='month');
+      renderCal();
+    }
     function addEventFromForm(){
       const date=calEl('cal-date').value, time=calEl('cal-time').value, title=calEl('cal-title').value.trim(), cat=calEl('cal-cat').value, memo=calEl('cal-memo').value.trim(), until=calEl('cal-until').value;
       if(!date||!title){alert('날짜와 제목은 필수입니다.');return;}
+      if(editId){
+        fbDB.ref('calendar/events/'+editId).update({date,time,title,cat,memo})
+          .then(cancelEdit).catch(e=>alert('수정 실패(권한 확인): '+e.message));
+        return;
+      }
       const base={time,title,cat,memo,by:calUser.email,ts:Date.now()};
       const ref=fbDB.ref('calendar/events');
       const clear=()=>{calEl('cal-title').value='';calEl('cal-memo').value='';calEl('cal-until').value='';};
@@ -330,43 +357,75 @@
       }).catch(e=>alert('삭제 실패: '+e.message));
     }
     window.__delEvent=delEvent;
+    window.__editEvent=function(id){
+      const e=calEvents[id]; if(!e) return;
+      editId=id;
+      calEl('cal-date').value=e.date||''; calEl('cal-time').value=e.time||'';
+      calEl('cal-cat').value=e.cat||CATS[0]; calEl('cal-title').value=e.title||'';
+      calEl('cal-memo').value=e.memo||''; calEl('cal-until').value=''; calEl('cal-until').disabled=true;
+      calEl('cal-add').textContent='수정 저장'; calEl('cal-cancel').style.display='inline-block';
+      calEl('cal-date').scrollIntoView({behavior:'smooth',block:'center'});
+    };
+    function cancelEdit(){
+      editId=null; calEl('cal-add').textContent='추가'; calEl('cal-cancel').style.display='none';
+      calEl('cal-until').disabled=false; calEl('cal-title').value=''; calEl('cal-memo').value=''; calEl('cal-until').value='';
+    }
     function ymd(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+    const DOW=['일','월','화','수','목','금','토'];
+    function eventRow(e, showDate){
+      let dt='';
+      if(showDate){ const d=new Date(e.date+'T00:00:00'); dt=`<b>${d.getMonth()+1}/${d.getDate()}(${DOW[d.getDay()]})</b> `; }
+      return `<div class="ev-row"><span class="ag-dot" style="background:${CATCOLOR[e.cat]||'#8a8f99'}"></span>`+
+        `<div class="ag-main"><div class="ag-l1">${dt}${e.time?esc(e.time)+' ':''}<span class="ag-cat">${esc(e.cat||'')}</span>${e.series?' <span class="ag-rep">⟲</span>':''}</div>`+
+        `<div class="ag-title">${esc(e.title)}</div>`+
+        (e.memo?`<div class="ag-memo">${esc(e.memo)}</div>`:'')+
+        (e.by?`<div class="ag-by">${esc(e.by)}</div>`:'')+
+        `</div><div class="ev-btns"><button class="ag-edit" onclick="__editEvent('${e.id}')">수정</button>`+
+        `<button class="ag-del" onclick="__delEvent('${e.id}')">삭제</button></div></div>`;
+    }
     function renderCal(){
-      const y=calMonth.getFullYear(), m=calMonth.getMonth();
+      calEl('cal-legend').innerHTML=CATS.map(c=>`<span class="cal-lg"><i style="background:${CATCOLOR[c]||'#8a8f99'}"></i>${esc(c)}</span>`).join('');
+      if(calView==='week') renderWeek(); else renderMonth();
+    }
+    function renderWeek(){
+      calEl('cal-grid').style.display='none'; calEl('cal-agenda').style.display='none'; calEl('cal-agenda-h').style.display='none';
+      const wk=calEl('cal-week'); wk.style.display='block';
+      const start=new Date(calCursor); start.setDate(start.getDate()-start.getDay());
+      const end=new Date(start); end.setDate(end.getDate()+6);
+      calEl('cal-label').textContent=`${start.getMonth()+1}/${start.getDate()} – ${end.getMonth()+1}/${end.getDate()}`;
+      const today=ymd(new Date());
+      let html='';
+      for(let i=0;i<7;i++){
+        const d=new Date(start); d.setDate(start.getDate()+i); const ds=ymd(d);
+        const evs=Object.keys(calEvents).map(id=>({id,...calEvents[id]})).filter(e=>e.date===ds).sort((a,b)=>(a.time||'').localeCompare(b.time||''));
+        const rows=evs.length? evs.map(e=>eventRow(e,false)).join('') : '<div class="wk-empty">일정 없음</div>';
+        html+=`<div class="wk-day${ds===today?' wk-today':''}"><div class="wk-dhead">${d.getMonth()+1}/${d.getDate()} (${DOW[d.getDay()]})</div>${rows}</div>`;
+      }
+      wk.innerHTML=html;
+    }
+    function renderMonth(){
+      calEl('cal-week').style.display='none'; calEl('cal-grid').style.display='grid';
+      calEl('cal-agenda').style.display='block'; calEl('cal-agenda-h').style.display='block';
+      const y=calCursor.getFullYear(), m=calCursor.getMonth();
       calEl('cal-label').textContent=`${y}년 ${m+1}월`;
       const byDate={};
       Object.keys(calEvents).forEach(id=>{const e=calEvents[id]; (byDate[e.date]=byDate[e.date]||[]).push({id,...e});});
-      const first=new Date(y,m,1), start=first.getDay(), days=new Date(y,m+1,0).getDate(), today=ymd(new Date());
+      const first=new Date(y,m,1), startDow=first.getDay(), days=new Date(y,m+1,0).getDate(), today=ymd(new Date());
       let cells='';
-      for(let i=0;i<start;i++) cells+='<div class="cal-cell cal-empty"></div>';
+      for(let i=0;i<startDow;i++) cells+='<div class="cal-cell cal-empty"></div>';
       for(let d=1;d<=days;d++){
         const ds=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
         const evs=(byDate[ds]||[]).sort((a,b)=>(a.time||'').localeCompare(b.time||''));
-        const chips=evs.map(e=>`<div class="cal-ev" style="background:${CATCOLOR[e.cat]||'#8a8f99'}" title="${esc(e.title)} ${esc(e.memo||'')} (${esc(e.by||'')})">`+
-          `<span>${e.series?'⟲ ':''}${e.time?esc(e.time)+' ':''}${esc(e.title)}</span>`+
-          `<button class="cal-del" onclick="__delEvent('${e.id}')">×</button></div>`).join('');
+        const chips=evs.map(e=>`<div class="cal-ev" style="background:${CATCOLOR[e.cat]||'#8a8f99'}" onclick="__editEvent('${e.id}')" title="${esc(e.title)} ${esc(e.memo||'')} (${esc(e.by||'')})">`+
+          `<span>${e.series?'⟲ ':''}${e.time?esc(e.time)+' ':''}${esc(e.title)}</span></div>`).join('');
         cells+=`<div class="cal-cell${ds===today?' cal-today':''}"><div class="cal-d">${d}</div>${chips}</div>`;
       }
-      calEl('cal-grid').innerHTML=
-        '<div class="cal-dow">일</div><div class="cal-dow">월</div><div class="cal-dow">화</div><div class="cal-dow">수</div><div class="cal-dow">목</div><div class="cal-dow">금</div><div class="cal-dow">토</div>'+cells;
-      // 카테고리 범례
-      calEl('cal-legend').innerHTML=CATS.map(c=>`<span class="cal-lg"><i style="background:${CATCOLOR[c]||'#8a8f99'}"></i>${esc(c)}</span>`).join('');
-      // 이 달 일정 상세 목록 (작은 화면에서도 전체 정보 노출)
-      const DOW=['일','월','화','수','목','금','토'];
+      calEl('cal-grid').innerHTML='<div class="cal-dow">일</div><div class="cal-dow">월</div><div class="cal-dow">화</div><div class="cal-dow">수</div><div class="cal-dow">목</div><div class="cal-dow">금</div><div class="cal-dow">토</div>'+cells;
       const ym=`${y}-${String(m+1).padStart(2,'0')}`;
       const monthEvs=Object.keys(calEvents).map(id=>({id,...calEvents[id]}))
         .filter(e=>String(e.date||'').slice(0,7)===ym)
         .sort((a,b)=>(a.date+'T'+(a.time||'')).localeCompare(b.date+'T'+(b.time||'')));
-      calEl('cal-agenda').innerHTML = monthEvs.length ? monthEvs.map(e=>{
-        const d=new Date(e.date+'T00:00:00');
-        const md=`${d.getMonth()+1}/${d.getDate()}(${DOW[d.getDay()]})`;
-        return `<div class="ag-row"><span class="ag-dot" style="background:${CATCOLOR[e.cat]||'#8a8f99'}"></span>`+
-          `<div class="ag-main"><div class="ag-l1"><b>${esc(md)}</b>${e.time?' '+esc(e.time):''} <span class="ag-cat">${esc(e.cat||'')}</span>${e.series?' <span class="ag-rep">⟲반복</span>':''}</div>`+
-          `<div class="ag-title">${esc(e.title)}</div>`+
-          (e.memo?`<div class="ag-memo">${esc(e.memo)}</div>`:'')+
-          (e.by?`<div class="ag-by">${esc(e.by)}</div>`:'')+
-          `</div><button class="ag-del" onclick="__delEvent('${e.id}')">삭제</button></div>`;
-      }).join('') : '<p class="muted">이 달 일정이 없습니다.</p>';
+      calEl('cal-agenda').innerHTML = monthEvs.length ? monthEvs.map(e=>eventRow(e,true)).join('') : '<p class="muted">이 달 일정이 없습니다.</p>';
     }
     // ----- 질문하기 (자료 근거 RAG 챗봇) -----
     const CHAT_MODEL="claude-haiku-4-5-20251001";

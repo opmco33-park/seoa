@@ -49,6 +49,26 @@
     .glossary .gl{font-size:.88rem;margin:5px 0;color:var(--ink)}
     .glossary .gl b{color:var(--accent)}
     .cal-rep-lbl{align-self:center;font-size:.82rem;color:var(--muted)}
+    .chat-fab{position:fixed;left:20px;bottom:20px;z-index:1000;width:56px;height:56px;border-radius:50%;border:none;background:var(--accent);color:#fff;font-size:1.5rem;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.28)}
+    .chat-fab:hover{filter:brightness(1.08)}
+    .chat-panel{position:fixed;left:20px;bottom:88px;z-index:1000;width:min(420px,92vw);max-height:min(640px,82vh);background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:0 12px 44px rgba(0,0,0,.24);flex-direction:column;overflow:hidden}
+    .chat-panel-head{display:flex;justify-content:space-between;align-items:center;padding:11px 16px;border-bottom:1px solid var(--line);font-family:'Lora',serif;font-size:1.05rem;flex:0 0 auto}
+    .chat-close{border:none;background:none;font-size:1.4rem;line-height:1;cursor:pointer;color:var(--muted)}
+    .chat-body{padding:14px 16px;overflow-y:auto}
+    @media(max-width:480px){.chat-panel{left:4vw;width:92vw;bottom:84px}}
+    .chat-keybox{background:var(--soft);border-radius:10px;padding:12px 14px;margin:10px 0;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+    .chat-keybox input{flex:1;min-width:160px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-family:inherit}
+    .chat-log{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px;min-height:160px;max-height:320px;overflow-y:auto;margin:10px 0}
+    .ch-msg{margin:10px 0;display:flex;flex-direction:column}
+    .ch-user{align-items:flex-end}.ch-ai{align-items:flex-start}
+    .ch-bubble{max-width:85%;padding:10px 14px;border-radius:14px;font-size:.92rem;line-height:1.6;white-space:pre-wrap;word-break:break-word}
+    .ch-user .ch-bubble{background:var(--accent);color:#fff;border-bottom-right-radius:4px}
+    .ch-ai .ch-bubble{background:var(--soft);color:var(--ink);border-bottom-left-radius:4px}
+    .ch-by{font-size:.68rem;color:var(--muted);margin-top:2px}
+    .ch-src{font-size:.74rem;color:var(--muted);margin-top:5px;max-width:85%}
+    .ch-src a{color:var(--pub);margin-right:8px}
+    .chat-inputbar{display:flex;gap:8px;align-items:flex-end}
+    .chat-inputbar textarea{flex:1;padding:10px 12px;border:1px solid var(--line);border-radius:10px;font-family:inherit;font-size:.95rem;resize:vertical}
     .cal-setup,.cal-login{background:#fff;border:1px solid var(--line);border-radius:12px;padding:22px;margin-top:18px;max-width:420px}
     .cal-login input{display:block;width:100%;box-sizing:border-box;margin:8px 0;padding:10px 12px;border:1px solid var(--line);border-radius:8px;font-family:inherit;font-size:.95rem}
     .cal-btn{font-family:inherit;font-weight:600;padding:9px 18px;border:none;border-radius:8px;background:var(--accent);color:#fff;cursor:pointer}
@@ -89,7 +109,7 @@
     .more-btn{display:block;width:100%;margin-top:10px;padding:12px;border:1px dashed var(--line);background:#fff;border-radius:10px;cursor:pointer;font-family:inherit;font-size:.9rem;color:var(--accent)}
     .more-btn:hover{border-color:var(--accent);background:var(--soft)}
     footer{margin-top:46px;padding-top:18px;border-top:1px solid var(--line);color:var(--muted);font-size:.78rem}
-    </style></head><body><div class='wrap'><h1>서아 통합 연구·케어</h1><p class='sub'>마지막 갱신 2026-06-03 10:01 · 논문 936 · 임상시험 30</p><div class='disclaimer'><b>읽기 전에.</b> 검색·정리를 돕는 도구가 만든 자료입니다. 요약·분석은 부정확할 수 있으며 진단·치료 판단이 아닙니다. <b>모든 내용은 원문과 담당 의료진을 통해 확인</b>하세요.</div><div class='sections' id='sections'></div><div id='sec-calendar'><div id='cal-setup' style='display:none' class='cal-setup'><b>공유 캘린더를 쓰려면 Firebase 설정이 필요합니다.</b><br>스크립트 CONFIG의 <code>firebase_config</code>에 Firebase 웹 앱 설정을 넣고, Realtime Database 보안 규칙으로 두 분만 접근하도록 잠그세요. 자세한 절차는 대화의 안내를 참고하세요.</div><div id='cal-login' style='display:none' class='cal-login'><h3>로그인</h3><p class='muted'>두 분만 접근할 수 있는 비공개 일정입니다.</p><input id='cal-email' type='email' placeholder='이메일' autocomplete='username'><input id='cal-pw' type='password' placeholder='비밀번호' autocomplete='current-password'><button id='cal-login-btn' class='cal-btn'>로그인</button><div id='cal-err' class='cal-err'></div></div><div id='cal-app' style='display:none'><div class='cal-bar'><span class='muted'>로그인: <b id='cal-who'></b></span><button id='cal-logout' class='cal-link'>로그아웃</button></div><div class='cal-form'><input id='cal-date' type='date'><input id='cal-time' type='time'><select id='cal-cat'></select><input id='cal-title' placeholder='일정 (예: 인지치료)'><input id='cal-memo' placeholder='메모 (선택)'><span class='cal-rep-lbl'>매주 반복 종료일</span><input id='cal-until' type='date' title='이 날짜까지 매주 같은 요일에 반복 (선택)'><button id='cal-add' class='cal-btn'>추가</button></div><div id='cal-legend' class='cal-legend'></div><div class='cal-nav'><button id='cal-prev' class='cal-link'>‹ 이전</button><b id='cal-label'></b><button id='cal-next' class='cal-link'>다음 ›</button></div><div id='cal-grid' class='cal-grid'></div></div></div><div id='sec-research' style='display:none'><div class='domains' id='domains'></div><div id='paper-view'><div class='axis' id='axis'></div><div class='tabs' id='tabs'></div><div class='controls'><input id='q' placeholder='검색어 (제목·요약 내)'><select id='type'><option value='all'>전체 종류</option><option value='pubmed'>논문</option><option value='trial'>임상시험</option></select><select id='year'></select></div><div class='countbar' id='countbar'></div><div id='list'></div><button class='more-btn' id='more' style='display:none'></button></div><div id='res-view' style='display:none'><p class='res-intro'>국내 공식 사이트에서 robots.txt를 지키며 모은 실용 자료입니다. 원문 확인은 각 링크에서.</p><div id='reslist'></div></div></div><div id='sec-synthesis' style='display:none'>
+    </style></head><body><div class='wrap'><h1>서아 통합 연구·케어</h1><p class='sub'>마지막 갱신 2026-06-03 10:28 · 논문 936 · 임상시험 30</p><div class='disclaimer'><b>읽기 전에.</b> 검색·정리를 돕는 도구가 만든 자료입니다. 요약·분석은 부정확할 수 있으며 진단·치료 판단이 아닙니다. <b>모든 내용은 원문과 담당 의료진을 통해 확인</b>하세요.</div><div class='sections' id='sections'></div><div id='sec-calendar'><div id='cal-setup' style='display:none' class='cal-setup'><b>공유 캘린더를 쓰려면 Firebase 설정이 필요합니다.</b><br>스크립트 CONFIG의 <code>firebase_config</code>에 Firebase 웹 앱 설정을 넣고, Realtime Database 보안 규칙으로 두 분만 접근하도록 잠그세요. 자세한 절차는 대화의 안내를 참고하세요.</div><div id='cal-login' style='display:none' class='cal-login'><h3>로그인</h3><p class='muted'>두 분만 접근할 수 있는 비공개 일정입니다.</p><input id='cal-email' type='email' placeholder='이메일' autocomplete='username'><input id='cal-pw' type='password' placeholder='비밀번호' autocomplete='current-password'><button id='cal-login-btn' class='cal-btn'>로그인</button><div id='cal-err' class='cal-err'></div></div><div id='cal-app' style='display:none'><div class='cal-bar'><span class='muted'>로그인: <b id='cal-who'></b></span><button id='cal-logout' class='cal-link'>로그아웃</button></div><div class='cal-form'><input id='cal-date' type='date'><input id='cal-time' type='time'><select id='cal-cat'></select><input id='cal-title' placeholder='일정 (예: 인지치료)'><input id='cal-memo' placeholder='메모 (선택)'><span class='cal-rep-lbl'>매주 반복 종료일</span><input id='cal-until' type='date' title='이 날짜까지 매주 같은 요일에 반복 (선택)'><button id='cal-add' class='cal-btn'>추가</button></div><div id='cal-legend' class='cal-legend'></div><div class='cal-nav'><button id='cal-prev' class='cal-link'>‹ 이전</button><b id='cal-label'></b><button id='cal-next' class='cal-link'>다음 ›</button></div><div id='cal-grid' class='cal-grid'></div></div></div><button id='chat-fab' class='chat-fab' aria-label='질문하기' title='질문하기'>💬</button><div id='chat-panel' class='chat-panel' style='display:none'><div class='chat-panel-head'><b>질문하기</b><button id='chat-close' class='chat-close' aria-label='닫기'>×</button></div><div class='chat-body'><div id='chat-setup' style='display:none' class='cal-setup'><b>질문하기를 쓰려면 Firebase 설정이 필요합니다.</b> 캘린더와 동일한 설정을 사용합니다.</div><div id='chat-login' style='display:none' class='cal-login'><h3>로그인</h3><p class='muted'>두 분만 사용할 수 있습니다.</p><input id='chat-email' type='email' placeholder='이메일' autocomplete='username'><input id='chat-pw' type='password' placeholder='비밀번호' autocomplete='current-password'><button id='chat-login-btn' class='cal-btn'>로그인</button><div id='chat-err' class='cal-err'></div></div><div id='chat-app' style='display:none'><div class='cal-bar'><span id='chat-key-status' class='muted'></span><button id='chat-logout' class='cal-link'>로그아웃</button></div><div id='chat-key-box' style='display:none' class='chat-keybox'><input id='chat-key-input' type='password' placeholder='Anthropic API 키 (sk-ant-...)'><button id='chat-key-save' class='cal-btn'>키 저장</button><p class='muted' style='font-size:.78rem;margin:6px 0 0'>키는 Firebase에 저장되어 로그인한 두 분만 사용합니다. Anthropic 콘솔에서 월 사용 한도를 걸어두길 권합니다.</p></div><div id='chat-log' class='chat-log'></div><div class='chat-inputbar'><textarea id='chat-input' rows='2' placeholder='질문 (예: 소토스 아동의 성장에 대해 알려줘)'></textarea><button id='chat-send' class='cal-btn'>보내기</button></div><p class='muted' style='font-size:.74rem;margin-top:6px'>답변은 모은 자료(논문·임상·국내자료)에 근거합니다. 의학적 판단은 담당 의료진과 상의하세요.</p></div></div></div><div id='sec-research' style='display:none'><div class='domains' id='domains'></div><div id='paper-view'><div class='axis' id='axis'></div><div class='tabs' id='tabs'></div><div class='controls'><input id='q' placeholder='검색어 (제목·요약 내)'><select id='type'><option value='all'>전체 종류</option><option value='pubmed'>논문</option><option value='trial'>임상시험</option></select><select id='year'></select></div><div class='countbar' id='countbar'></div><div id='list'></div><button class='more-btn' id='more' style='display:none'></button></div><div id='res-view' style='display:none'><p class='res-intro'>국내 공식 사이트에서 robots.txt를 지키며 모은 실용 자료입니다. 원문 확인은 각 링크에서.</p><div id='reslist'></div></div></div><div id='sec-synthesis' style='display:none'>
         <section class="synthesis">
           <div class="synth-head">종합 분석 <span class="synth-meta">전체 37건 기반 · 2026-06-03 자동 갱신</span></div>
           <p class="synth-overview">NSD1은 히스톤 메틸화효소로서 Sotos 증후군의 주요 원인유전자이면서, 소아 급성백혈병(특히 NUP98::NSD1 융합)의 핵심 암유전자로 작용합니다. 최근 연구는 발달 이상과 암 발생 양쪽 경로에서 NSD1의 역할을 규명하고 있으며, 진단 기술과 치료 표적 개발이 진행 중입니다.</p>
@@ -233,26 +253,33 @@
     }
     // ----- 공유 캘린더 (Firebase) -----
     const CATCOLOR={'인지':'#5b8def','운동':'#2bb673','자조':'#e8923b','언어':'#9b6fd6','병원':'#e05c5c','기타':'#8a8f99'};
-    let fbAuth=null, fbDB=null, calUser=null, calEvents={}, calMonth=new Date();
+    let fbReady=false, fbAuth=null, fbDB=null, calUser=null, calEvents={}, calMonth=new Date();
+    const authListeners=[];
     function calEl(id){return document.getElementById(id);}
-    function initCalendar(){
-      const setup=calEl('cal-setup'), login=calEl('cal-login'), app=calEl('cal-app');
-      if(!FB){ setup.style.display='block'; login.style.display='none'; app.style.display='none'; return; }
-      setup.style.display='none';
+    function ensureFirebase(){
+      if(fbReady) return true;
+      if(!FB) return false;
       try{
         if(!firebase.apps.length) firebase.initializeApp(FB);
-        fbAuth=firebase.auth(); fbDB=firebase.database();
-      }catch(e){ setup.style.display='block'; setup.innerHTML='<p class="muted">Firebase 초기화 오류: '+esc(e.message)+'</p>'; return; }
-      fbAuth.onAuthStateChanged(u=>{
-        calUser=u;
+        fbAuth=firebase.auth(); fbDB=firebase.database(); fbReady=true;
+        fbAuth.onAuthStateChanged(u=>{ calUser=u; authListeners.forEach(fn=>{try{fn(u);}catch(e){}}); });
+        return true;
+      }catch(e){ return false; }
+    }
+    function onAuth(fn){ authListeners.push(fn); if(fbReady && fbAuth) fn(fbAuth.currentUser); }
+    function fbLogin(emEl,pwEl,errEl){
+      const em=calEl(emEl).value.trim(), pw=calEl(pwEl).value; calEl(errEl).textContent='';
+      fbAuth.signInWithEmailAndPassword(em,pw).catch(e=>{calEl(errEl).textContent='로그인 실패: '+e.message;});
+    }
+    function initCalendar(){
+      const setup=calEl('cal-setup'), login=calEl('cal-login'), app=calEl('cal-app');
+      if(!ensureFirebase()){ setup.style.display='block'; login.style.display='none'; app.style.display='none'; return; }
+      setup.style.display='none';
+      onAuth(u=>{
         if(u){ login.style.display='none'; app.style.display='block'; calEl('cal-who').textContent=u.email; subscribeCal(); buildCatOptions(); }
         else { login.style.display='block'; app.style.display='none'; }
       });
-      calEl('cal-login-btn').onclick=()=>{
-        const em=calEl('cal-email').value.trim(), pw=calEl('cal-pw').value;
-        calEl('cal-err').textContent='';
-        fbAuth.signInWithEmailAndPassword(em,pw).catch(e=>{calEl('cal-err').textContent='로그인 실패: '+e.message;});
-      };
+      calEl('cal-login-btn').onclick=()=>fbLogin('cal-email','cal-pw','cal-err');
       calEl('cal-pw').addEventListener('keydown',e=>{if(e.key==='Enter')calEl('cal-login-btn').click();});
       calEl('cal-logout').onclick=()=>fbAuth.signOut();
       calEl('cal-prev').onclick=()=>{calMonth.setMonth(calMonth.getMonth()-1);renderCal();};
@@ -313,9 +340,110 @@
       // 카테고리 범례
       calEl('cal-legend').innerHTML=CATS.map(c=>`<span class="cal-lg"><i style="background:${CATCOLOR[c]||'#8a8f99'}"></i>${esc(c)}</span>`).join('');
     }
+    // ----- 질문하기 (자료 근거 RAG 챗봇) -----
+    const CHAT_MODEL="claude-haiku-4-5-20251001";
+    let chatInited=false, chatKey="", chatCorpus=null, chatBusy=false;
+    const CHAT_SYSTEM="당신은 발달지연 아동(Sotos 증후군) 보호자를 돕는 보조자입니다. 아래 '근거 자료'에 적힌 내용에만 기반해 한국어로 쉽게 답하세요. "
+      +"규칙: (1) 자료에 없는 내용은 지어내지 말고 '모은 자료에서는 확인되지 않습니다'라고 답합니다. "
+      +"(2) 진단·치료·복용 등 의학적 권고는 하지 않습니다. 정보 정리까지만 하고, 판단은 담당 의료진과 상의하도록 안내합니다. "
+      +"(3) 근거로 쓴 자료는 문장 끝에 [번호]로 표시합니다. (4) 과장 없이 확실한 것과 연구 중인 것을 구분합니다.";
+    function initChat(){
+      const setup=calEl('chat-setup'), login=calEl('chat-login'), app=calEl('chat-app');
+      if(!ensureFirebase()){ setup.style.display='block'; login.style.display='none'; app.style.display='none'; return; }
+      setup.style.display='none';
+      onAuth(u=>{
+        if(u){ login.style.display='none'; app.style.display='block'; loadChatKey(); subscribeChat(); }
+        else { login.style.display='block'; app.style.display='none'; }
+      });
+      calEl('chat-login-btn').onclick=()=>fbLogin('chat-email','chat-pw','chat-err');
+      calEl('chat-pw').addEventListener('keydown',e=>{if(e.key==='Enter')calEl('chat-login-btn').click();});
+      calEl('chat-logout').onclick=()=>fbAuth.signOut();
+      calEl('chat-key-save').onclick=saveChatKey;
+      calEl('chat-send').onclick=sendChat;
+      calEl('chat-input').addEventListener('keydown',e=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendChat(); }});
+    }
+    function loadChatKey(){
+      fbDB.ref('secure/anthropicKey').once('value').then(s=>{
+        chatKey=s.val()||"";
+        calEl('chat-key-status').textContent = chatKey? '✅ API 키 등록됨' : '⚠ API 키 미등록 — 아래에 입력해 저장하세요';
+        calEl('chat-key-box').style.display = chatKey? 'none':'block';
+      }).catch(e=>{ calEl('chat-key-status').textContent='키 확인 오류(보안 규칙 확인): '+e.message; });
+    }
+    function saveChatKey(){
+      const k=calEl('chat-key-input').value.trim(); if(!k) return;
+      fbDB.ref('secure/anthropicKey').set(k).then(()=>{ chatKey=k; calEl('chat-key-input').value=''; loadChatKey(); })
+        .catch(e=>alert('키 저장 실패(보안 규칙 확인): '+e.message));
+    }
+    function subscribeChat(){
+      fbDB.ref('chat/messages').limitToLast(100).on('value',snap=>{
+        const v=snap.val()||{}; renderChat(Object.keys(v).map(k=>v[k]).sort((a,b)=>a.ts-b.ts));
+      }, err=>{ calEl('chat-log').innerHTML='<p class="muted">대화 읽기 오류(보안 규칙 확인): '+esc(err.message)+'</p>'; });
+    }
+    function renderChat(arr){
+      const log=calEl('chat-log');
+      log.innerHTML=arr.map(m=>{
+        if(m.role==='user') return `<div class="ch-msg ch-user"><div class="ch-bubble">${esc(m.text)}</div><div class="ch-by">${esc(m.by||'')}</div></div>`;
+        const src=(m.sources||[]).map((s,i)=>`<a href="${esc(s.url)}" target="_blank" rel="noopener">[${i+1}] ${esc(s.title)}</a>`).join(' ');
+        return `<div class="ch-msg ch-ai"><div class="ch-bubble">${esc(m.text).replace(/\n/g,'<br>')}</div>`+(src?`<div class="ch-src">근거: ${src}</div>`:'')+`</div>`;
+      }).join('')||'<p class="muted">아직 대화가 없습니다. 자료에 근거해 답해 드립니다.</p>';
+      log.scrollTop=log.scrollHeight;
+    }
+    async function loadCorpus(){
+      if(chatCorpus) return chatCorpus;
+      const out=[];
+      const sources=[['data/knowledge_base.jsonl','research'],['data/resources.jsonl','resource']];
+      for(const [path,kind] of sources){
+        try{
+          const r=await fetch(path,{cache:'no-store'}); if(!r.ok) continue;
+          const txt=await r.text();
+          txt.split('\n').forEach(line=>{ if(!line.trim())return; try{
+            const o=JSON.parse(line), ai=o.ai||{};
+            const text=[o.title, ai.summary_3lines, ai.relevance, (kind==='resource'?(ai.tips||[]).join(' '):''), (o.raw_text||'').slice(0,400)].filter(Boolean).join(' ');
+            out.push({title:o.title||'(제목 없음)', url:o.url||'', kind, source:o.source||(o.type==='trial'?'ClinicalTrials':'PubMed'), text});
+          }catch(e){} });
+        }catch(e){}
+      }
+      chatCorpus=out; return out;
+    }
+    function retrieve(q, corpus, n){
+      const toks=q.toLowerCase().split(/[\s,.;?!()]+/).filter(t=>t.length>1);
+      return corpus.map(it=>{ const t=it.text.toLowerCase(); let s=0; toks.forEach(tok=>{ if(t.includes(tok)) s+=(it.title.toLowerCase().includes(tok)?2:1); }); return {it,s}; })
+        .filter(x=>x.s>0).sort((a,b)=>b.s-a.s).slice(0,n).map(x=>x.it);
+    }
+    async function sendChat(){
+      if(chatBusy) return;
+      const q=calEl('chat-input').value.trim(); if(!q) return;
+      if(!chatKey){ alert('먼저 Anthropic API 키를 등록하세요.'); return; }
+      chatBusy=true; calEl('chat-send').disabled=true; calEl('chat-input').value='';
+      fbDB.ref('chat/messages').push({role:'user', text:q, by:(calUser&&calUser.email)||'', ts:Date.now()});
+      try{
+        const corpus=await loadCorpus();
+        const hits=retrieve(q, corpus, 12);
+        const srcList=hits.map((h,i)=>`[${i+1}] (${h.kind==='resource'?'국내자료':h.source}) ${h.title}\n${h.text.slice(0,500)}`).join('\n\n');
+        const user=`질문: ${q}\n\n근거 자료:\n${srcList||'(관련 자료를 찾지 못했습니다)'}`;
+        const resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',
+          headers:{'Content-Type':'application/json','x-api-key':chatKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+          body:JSON.stringify({model:CHAT_MODEL,max_tokens:1024,system:CHAT_SYSTEM,messages:[{role:'user',content:user}]})});
+        const data=await resp.json();
+        if(data.error) throw new Error(data.error.message||'API 오류');
+        const ans=(data.content||[]).filter(c=>c.type==='text').map(c=>c.text).join('\n').trim()||'(빈 응답)';
+        fbDB.ref('chat/messages').push({role:'assistant', text:ans, sources:hits.map(h=>({title:h.title,url:h.url})), ts:Date.now()});
+      }catch(e){
+        fbDB.ref('chat/messages').push({role:'assistant', text:'답변 생성 오류: '+e.message+' (API 키·사용한도·네트워크를 확인하세요)', ts:Date.now()});
+      }finally{ chatBusy=false; calEl('chat-send').disabled=false; }
+    }
     buildSections();
     buildDomains();
     buildAxis();
     applyDomainView();
     showSection('calendar');
+    // 플로팅 질문하기 버튼
+    let chatOpen=false;
+    function toggleChat(){
+      chatOpen=!chatOpen;
+      calEl('chat-panel').style.display=chatOpen?'flex':'none';
+      if(chatOpen && !chatInited){chatInited=true; initChat();}
+    }
+    calEl('chat-fab').onclick=toggleChat;
+    calEl('chat-close').onclick=()=>{chatOpen=false; calEl('chat-panel').style.display='none';};
     </script></div></body></html>

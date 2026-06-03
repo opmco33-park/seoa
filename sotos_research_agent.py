@@ -430,16 +430,43 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime)
     .qbox{background:var(--soft);border-radius:8px;padding:9px 13px;font-size:.86rem}
     .qbox ul{margin:4px 0 0;padding-left:17px}
     .muted{color:var(--muted)}
+    .tabs{display:flex;gap:7px;flex-wrap:wrap;margin:22px 0 12px}
+    .tab{font-family:inherit;font-size:.84rem;padding:7px 13px;border:1px solid var(--line);background:#fff;border-radius:20px;cursor:pointer;color:var(--ink)}
+    .tab:hover{border-color:var(--accent)}
+    .tab.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+    .tab .n{opacity:.65;font-size:.76rem;margin-left:2px}
+    .more-btn{display:block;width:100%;margin-top:10px;padding:12px;border:1px dashed var(--line);background:#fff;border-radius:10px;cursor:pointer;font-family:inherit;font-size:.9rem;color:var(--accent)}
+    .more-btn:hover{border-color:var(--accent);background:var(--soft)}
     footer{margin-top:46px;padding-top:18px;border-top:1px solid var(--line);color:var(--muted);font-size:.78rem}
     """
 
     js = """
     const ITEMS = __DATA__;
-    const listEl = document.getElementById('list');
-    const countEl = document.getElementById('countbar');
-    const qEl = document.getElementById('q');
-    const typeEl = document.getElementById('type');
+    const PAGE = 30;
+    let stageF='전체', typeF='all', yearF='all', shown=PAGE;
+    const listEl=document.getElementById('list');
+    const countEl=document.getElementById('countbar');
+    const tabsEl=document.getElementById('tabs');
+    const qEl=document.getElementById('q');
+    const typeEl=document.getElementById('type');
+    const yearEl=document.getElementById('year');
+    const moreEl=document.getElementById('more');
     function esc(s){const d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML;}
+    function stageOf(it){return it.has_ai && it.stage ? it.stage : '미분석';}
+    function yearOf(it){return String(it.date||'').slice(0,4);}
+    const ORDER=['리뷰','관찰연구','초기임상','후기임상','전임상','사례보고','기타','미분석'];
+    const stageCounts={};
+    ITEMS.forEach(it=>{const s=stageOf(it);stageCounts[s]=(stageCounts[s]||0)+1;});
+    const stages=Object.keys(stageCounts).sort((a,b)=>{
+      const ia=ORDER.indexOf(a),ib=ORDER.indexOf(b);return (ia<0?99:ia)-(ib<0?99:ib);});
+    const years=[...new Set(ITEMS.map(yearOf).filter(Boolean))].sort().reverse();
+    yearEl.innerHTML="<option value='all'>전체 연도</option>"+years.map(y=>`<option value="${y}">${y}</option>`).join('');
+    function buildTabs(){
+      let h=`<button class="tab${stageF==='전체'?' active':''}" data-s="전체">전체 <span class="n">${ITEMS.length}</span></button>`;
+      h+=stages.map(s=>`<button class="tab${stageF===s?' active':''}" data-s="${esc(s)}">${esc(s)} <span class="n">${stageCounts[s]}</span></button>`).join('');
+      tabsEl.innerHTML=h;
+      tabsEl.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{stageF=b.dataset.s;shown=PAGE;buildTabs();render();});
+    }
     function card(it){
       const src = it.type==='pubmed' ? 'PubMed' : 'ClinicalTrials.gov';
       const meta = it.type==='pubmed'
@@ -459,20 +486,29 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime)
         `<h3><a href="${esc(it.url)}" target="_blank" rel="noopener">${esc(it.title)}</a></h3>`+
         `<p class="meta">${meta}</p>${body}</article>`;
     }
-    function render(){
-      const q = qEl.value.trim().toLowerCase();
-      const t = typeEl.value;
-      let rows = ITEMS.filter(it=>{
-        if(t!=='all' && it.type!==t) return false;
-        if(!q) return true;
-        return (it.title+' '+it.summary+' '+it.relevance).toLowerCase().includes(q);
-      });
-      rows.sort((a,b)=> String(b.date).localeCompare(String(a.date)));
-      countEl.textContent = `${rows.length}건 표시 (전체 ${ITEMS.length}건)`;
-      listEl.innerHTML = rows.map(card).join('') || '<p class="muted">조건에 맞는 항목이 없습니다.</p>';
+    function filtered(){
+      const q=qEl.value.trim().toLowerCase();
+      return ITEMS.filter(it=>{
+        if(stageF!=='전체' && stageOf(it)!==stageF) return false;
+        if(typeF!=='all' && it.type!==typeF) return false;
+        if(yearF!=='all' && yearOf(it)!==yearF) return false;
+        if(q && !((it.title+' '+it.summary+' '+it.relevance).toLowerCase().includes(q))) return false;
+        return true;
+      }).sort((a,b)=>String(b.date).localeCompare(String(a.date)));
     }
-    qEl.addEventListener('input', render);
-    typeEl.addEventListener('change', render);
+    function render(){
+      const rows=filtered();
+      const page=rows.slice(0,shown);
+      countEl.textContent=`${rows.length}건 중 ${page.length}건 표시`;
+      listEl.innerHTML=page.map(card).join('')||'<p class="muted">조건에 맞는 항목이 없습니다.</p>';
+      if(rows.length>shown){moreEl.style.display='block';moreEl.textContent=`더 보기 (남은 ${rows.length-shown}건)`;}
+      else{moreEl.style.display='none';}
+    }
+    qEl.addEventListener('input',()=>{shown=PAGE;render();});
+    typeEl.addEventListener('change',()=>{typeF=typeEl.value;shown=PAGE;render();});
+    yearEl.addEventListener('change',()=>{yearF=yearEl.value;shown=PAGE;render();});
+    moreEl.addEventListener('click',()=>{shown+=PAGE;render();});
+    buildTabs();
     render();
     """
     js = js.replace("__DATA__", data_json)
@@ -489,10 +525,13 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime)
         "<div class='disclaimer'><b>읽기 전에.</b> 검색·정리를 돕는 도구가 만든 자료입니다. "
         "요약·분석은 부정확할 수 있으며 진단·치료 판단이 아닙니다. <b>모든 내용은 원문과 담당 의료진을 통해 확인</b>하세요.</div>"
         f"{synth_html}"
+        "<div class='tabs' id='tabs'></div>"
         "<div class='controls'><input id='q' placeholder='검색어 (제목·요약 내)'>"
-        "<select id='type'><option value='all'>전체</option>"
-        "<option value='pubmed'>논문</option><option value='trial'>임상시험</option></select></div>"
+        "<select id='type'><option value='all'>전체 종류</option>"
+        "<option value='pubmed'>논문</option><option value='trial'>임상시험</option></select>"
+        "<select id='year'></select></div>"
         "<div class='countbar' id='countbar'></div><div id='list'></div>"
+        "<button class='more-btn' id='more' style='display:none'></button>"
         "<footer>누적 기록: data/knowledge_base.jsonl · 검색식·주기는 스크립트 CONFIG에서 수정 · v2.0</footer>"
         f"<script>{js}</script></div></body></html>"
     )
@@ -575,26 +614,34 @@ def main():
     else:
         to_process = all_new
 
-    # --- 항목별 AI 분석 ---
+    # --- 항목별 AI 분석 + 중간 저장 ---
+    # 긴 백필 중 중단(절전·끊김 등)돼도 진행분이 보존되고, --backfill을 다시 실행하면
+    # 이미 끝낸 항목은 건너뛰고 남은 것부터 이어서 처리합니다.
+    def flush(batch):
+        if not batch:
+            return
+        for it in batch:
+            it["fetched_at"] = run_time.isoformat()
+        append_kb(batch)
+        seen["pmids"].extend(i["id"] for i in batch if i["type"] == "pubmed")
+        seen["ncts"].extend(i["id"] for i in batch if i["type"] == "trial")
+        save_seen(seen)
+
     if use_ai and to_process:
         log(f"AI 분석 중… ({len(to_process)}건)")
+        pending = []
         for idx, it in enumerate(to_process, 1):
             it["ai"] = ai_summarize(it, api_key)
-            if idx % 25 == 0:
-                log(f"  분석 진행: {idx}/{len(to_process)}")
+            pending.append(it)
+            if idx % 25 == 0:                     # 25건마다 중간 저장
+                flush(pending); pending = []
+                log(f"  분석·저장 진행: {idx}/{len(to_process)}")
             time.sleep(0.4)
-    elif CONFIG["use_ai_summary"] and not api_key:
-        log("! ANTHROPIC_API_KEY 미설정 → AI 분석 건너뜀(원문만, 비용 0).")
-
-    # --- 상태/지식베이스 갱신 (처리한 것만 seen) ---
-    processed = {i["id"] for i in to_process}
-    seen["pmids"].extend(i["id"] for i in new_pubmed if i["id"] in processed)
-    seen["ncts"].extend(i["id"] for i in new_trials if i["id"] in processed)
-    save_seen(seen)
-    if to_process:
-        for it in to_process:
-            it["fetched_at"] = run_time.isoformat()
-        append_kb(to_process)
+        flush(pending)                            # 남은 것 저장
+    else:
+        if CONFIG["use_ai_summary"] and not api_key:
+            log("! ANTHROPIC_API_KEY 미설정 → AI 분석 건너뜀(원문만, 비용 0).")
+        flush(to_process)                         # AI 없이도 수집분은 저장
 
     # --- 전체 지식베이스 로드 ---
     all_items = load_kb()

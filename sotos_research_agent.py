@@ -58,7 +58,7 @@ CONFIG = {
     # --- 종합 분석(synthesis) ---
     "synthesis_enabled": True,
     "synthesis_batch_size": 40,     # 한 묶음에 넣을 항목 수 (맵-리듀스)
-    "synthesis_max_tokens": 2048,
+    "synthesis_max_tokens": 4096,
 
     # --- NCBI 예의(권장) ---
     "ncbi_tool": "sotos_research_agent",
@@ -344,6 +344,10 @@ def _call_anthropic(api_key, system, user, max_tokens):
 
 def _parse_json_loose(text: str):
     text = text.replace("```json", "").replace("```", "").strip()
+    # 본문 앞뒤에 설명이 붙어도 가장 바깥 JSON 객체만 추출
+    s, e = text.find("{"), text.rfind("}")
+    if s != -1 and e != -1 and e > s:
+        text = text[s:e + 1]
     return json.loads(text)
 
 
@@ -575,11 +579,12 @@ def synthesize(all_items: list, api_key: str) -> dict | None:
     if not batch_notes:
         return None
     reduce_user = "다음은 여러 묶음의 메모입니다. 전체를 쉬운 말로 종합하세요:\n\n" + "\n\n".join(batch_notes)
+    raw = ""
     try:
-        result = _parse_json_loose(_call_anthropic(api_key, SYNTH_REDUCE_SYSTEM, reduce_user,
-                                                   CONFIG["synthesis_max_tokens"]))
+        raw = _call_anthropic(api_key, SYNTH_REDUCE_SYSTEM, reduce_user, CONFIG["synthesis_max_tokens"])
+        result = _parse_json_loose(raw)
     except Exception as e:
-        log(f"  ! 종합 단계 실패({e})")
+        log(f"  ! 종합 단계 실패({e}) — 응답 일부: {raw[:160]!r}")
         return None
     result["generated_at"] = dt.datetime.now().isoformat()
     result["based_on"] = len(usable)
@@ -1412,6 +1417,11 @@ def main():
         if new_synth:
             SYNTH_PATH.write_text(json.dumps(new_synth, ensure_ascii=False, indent=2), encoding="utf-8")
             log(f"종합분석 갱신 완료 (용어풀이 {len(new_synth.get('glossary', []))}개).")
+        else:
+            log("종합분석 생성 실패 — 기존 분석을 유지합니다(빈 값으로 덮어쓰지 않음).")
+            if SYNTH_PATH.exists():
+                try: new_synth = json.loads(SYNTH_PATH.read_text(encoding="utf-8"))
+                except Exception: new_synth = None
         INDEX_PATH.write_text(render_dashboard(items, new_synth, run_time, load_resources()), encoding="utf-8")
         log(f"대시보드 재발행 → {INDEX_PATH}")
         return

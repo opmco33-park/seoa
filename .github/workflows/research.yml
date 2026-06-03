@@ -1,16 +1,22 @@
 # 이 파일은 저장소의  .github/workflows/research.yml  경로에 두세요.
-# (폴더가 없으면 새로 만드세요: .github 안에 workflows 폴더)
 
 name: Sotos Research Agent
 
 on:
   schedule:
-    # UTC 기준입니다. UTC 21:00 = 한국시간(KST) 06:00. 매일 아침 자동 실행.
-    # (깃허브 예약은 혼잡 시 10~30분 지연될 수 있으나 문헌 추적엔 무관합니다.)
+    # UTC 21:00 = 한국시간(KST) 06:00. 매일 자동 실행. (혼잡 시 10~30분 지연 가능)
     - cron: "0 21 * * *"
-  workflow_dispatch:   # 저장소 Actions 탭에서 수동으로 "Run workflow" 버튼 제공
+  workflow_dispatch:        # Actions 탭에서 수동 실행 + 모드 선택
+    inputs:
+      mode:
+        description: "실행 모드 선택"
+        type: choice
+        default: normal
+        options:
+          - normal      # 평소: 최근 신규만 분석·갱신
+          - retag       # 일회성: 기존 전체에 주제 꼬리표 달기
+          - backfill    # 일회성: 과거 20년치 전체 분석
 
-# 결과(데이터·대시보드)를 저장소에 다시 커밋하려면 쓰기 권한이 필요합니다.
 permissions:
   contents: write
 
@@ -29,18 +35,23 @@ jobs:
       - name: 의존성 설치
         run: pip install requests
 
-      - name: 에이전트 실행 (평소=증분 모드)
+      - name: 에이전트 실행
         env:
-          # 아래 키는 저장소 Secrets에 등록한 값이 자동 주입됩니다. 코드엔 키가 없습니다.
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: python sotos_research_agent.py
+          MODE: ${{ github.event.inputs.mode }}
+        run: |
+          if [ "$MODE" = "retag" ]; then
+            python sotos_research_agent.py --retag
+          elif [ "$MODE" = "backfill" ]; then
+            python sotos_research_agent.py --backfill
+          else
+            python sotos_research_agent.py
+          fi
 
       - name: 결과 커밋 & 푸시
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add data docs
-          # 변경이 있을 때만 커밋(없으면 조용히 통과). 이 커밋이 저장소 '활동'이 되어
-          # 60일 비활성 자동중지도 예방됩니다(자가 유지).
           git diff --staged --quiet || git commit -m "연구 데이터 자동 갱신 $(date -u +%Y-%m-%d)"
           git push

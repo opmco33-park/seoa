@@ -97,7 +97,7 @@ CONFIG = {
         "appId": "1:214737228161:web:fe4f733af7ac779a7e5880",
         "measurementId": "G-30S7S7T6K7",
     },
-    "calendar_categories": ["인지", "운동", "자조", "언어", "병원", "기타"],
+    "calendar_categories": ["인지", "운동", "자조", "한글", "수영", "수영(학교)", "병원", "기타"],
 }
 
 # 연구 '영역(domain)'별 검색 스트림. 영역을 추가/수정하려면 여기만 고치면 됩니다.
@@ -707,13 +707,13 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime,
     .glossary .gl{font-size:.88rem;margin:5px 0;color:var(--ink)}
     .glossary .gl b{color:var(--accent)}
     .cal-rep-lbl{align-self:center;font-size:.82rem;color:var(--muted)}
-    .chat-fab{position:fixed;left:20px;bottom:20px;z-index:1000;width:56px;height:56px;border-radius:50%;border:none;background:var(--accent);color:#fff;font-size:1.5rem;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.28)}
+    .chat-fab{position:fixed;right:20px;bottom:20px;z-index:1000;width:56px;height:56px;border-radius:50%;border:none;background:var(--accent);color:#fff;font-size:1.5rem;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.28)}
     .chat-fab:hover{filter:brightness(1.08)}
-    .chat-panel{position:fixed;left:20px;bottom:88px;z-index:1000;width:min(420px,92vw);max-height:min(640px,82vh);background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:0 12px 44px rgba(0,0,0,.24);flex-direction:column;overflow:hidden}
+    .chat-panel{position:fixed;right:20px;bottom:88px;z-index:1000;width:min(420px,92vw);max-height:min(640px,82vh);background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:0 12px 44px rgba(0,0,0,.24);flex-direction:column;overflow:hidden}
     .chat-panel-head{display:flex;justify-content:space-between;align-items:center;padding:11px 16px;border-bottom:1px solid var(--line);font-family:'Lora',serif;font-size:1.05rem;flex:0 0 auto}
     .chat-close{border:none;background:none;font-size:1.4rem;line-height:1;cursor:pointer;color:var(--muted)}
     .chat-body{padding:14px 16px;overflow-y:auto}
-    @media(max-width:480px){.chat-panel{left:4vw;width:92vw;bottom:84px}}
+    @media(max-width:480px){.chat-panel{right:4vw;width:92vw;bottom:84px}}
     .chat-keybox{background:var(--soft);border-radius:10px;padding:12px 14px;margin:10px 0;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
     .chat-keybox input{flex:1;min-width:160px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-family:inherit}
     .chat-log{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px;min-height:160px;max-height:320px;overflow-y:auto;margin:10px 0}
@@ -749,6 +749,18 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime,
     .cal-ev span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .cal-del{border:none;background:rgba(0,0,0,.18);color:#fff;border-radius:4px;cursor:pointer;font-size:.7rem;line-height:1;padding:1px 4px}
     @media(max-width:640px){.cal-cell{min-height:62px}.cal-ev{font-size:.66rem}}
+    .cal-agenda-h{font-family:'Lora',serif;font-size:1.05rem;margin:22px 0 8px}
+    .cal-agenda .ag-row{display:flex;gap:10px;align-items:flex-start;background:#fff;border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:7px}
+    .ag-dot{flex:0 0 auto;width:12px;height:12px;border-radius:50%;margin-top:5px}
+    .ag-main{flex:1;min-width:0}
+    .ag-l1{font-size:.86rem;color:var(--muted)}
+    .ag-cat{background:var(--soft);border-radius:5px;padding:1px 7px;font-size:.76rem}
+    .ag-rep{color:var(--accent);font-size:.74rem}
+    .ag-title{font-weight:600;font-size:1rem;margin:2px 0;word-break:break-word}
+    .ag-memo{font-size:.9rem;color:var(--ink);word-break:break-word;white-space:pre-wrap}
+    .ag-by{font-size:.74rem;color:var(--muted);margin-top:2px}
+    .ag-del{flex:0 0 auto;border:1px solid var(--line);background:#fff;color:var(--muted);border-radius:7px;padding:4px 9px;font-size:.78rem;cursor:pointer;font-family:inherit}
+    .ag-del:hover{border-color:#e05c5c;color:#e05c5c}
     .domains{display:flex;gap:7px;flex-wrap:wrap;margin:18px 0 4px}
     .dombtn{font-family:inherit;font-size:.86rem;font-weight:500;padding:8px 15px;border:1px solid var(--line);background:#fff;border-radius:9px;cursor:pointer;color:var(--ink)}
     .dombtn:hover{border-color:var(--accent)}
@@ -904,7 +916,7 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime,
       }).join('');
     }
     // ----- 공유 캘린더 (Firebase) -----
-    const CATCOLOR={'인지':'#5b8def','운동':'#2bb673','자조':'#e8923b','언어':'#9b6fd6','병원':'#e05c5c','기타':'#8a8f99'};
+    const CATCOLOR={'인지':'#5b8def','운동':'#2bb673','자조':'#e8923b','한글':'#9b6fd6','수영':'#16b1c4','수영(학교)':'#0e7c8a','병원':'#e05c5c','기타':'#8a8f99'};
     let fbReady=false, fbAuth=null, fbDB=null, calUser=null, calEvents={}, calMonth=new Date();
     const authListeners=[];
     function calEl(id){return document.getElementById(id);}
@@ -991,6 +1003,22 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime,
         '<div class="cal-dow">일</div><div class="cal-dow">월</div><div class="cal-dow">화</div><div class="cal-dow">수</div><div class="cal-dow">목</div><div class="cal-dow">금</div><div class="cal-dow">토</div>'+cells;
       // 카테고리 범례
       calEl('cal-legend').innerHTML=CATS.map(c=>`<span class="cal-lg"><i style="background:${CATCOLOR[c]||'#8a8f99'}"></i>${esc(c)}</span>`).join('');
+      // 이 달 일정 상세 목록 (작은 화면에서도 전체 정보 노출)
+      const DOW=['일','월','화','수','목','금','토'];
+      const ym=`${y}-${String(m+1).padStart(2,'0')}`;
+      const monthEvs=Object.keys(calEvents).map(id=>({id,...calEvents[id]}))
+        .filter(e=>String(e.date||'').slice(0,7)===ym)
+        .sort((a,b)=>(a.date+'T'+(a.time||'')).localeCompare(b.date+'T'+(b.time||'')));
+      calEl('cal-agenda').innerHTML = monthEvs.length ? monthEvs.map(e=>{
+        const d=new Date(e.date+'T00:00:00');
+        const md=`${d.getMonth()+1}/${d.getDate()}(${DOW[d.getDay()]})`;
+        return `<div class="ag-row"><span class="ag-dot" style="background:${CATCOLOR[e.cat]||'#8a8f99'}"></span>`+
+          `<div class="ag-main"><div class="ag-l1"><b>${esc(md)}</b>${e.time?' '+esc(e.time):''} <span class="ag-cat">${esc(e.cat||'')}</span>${e.series?' <span class="ag-rep">⟲반복</span>':''}</div>`+
+          `<div class="ag-title">${esc(e.title)}</div>`+
+          (e.memo?`<div class="ag-memo">${esc(e.memo)}</div>`:'')+
+          (e.by?`<div class="ag-by">${esc(e.by)}</div>`:'')+
+          `</div><button class="ag-del" onclick="__delEvent('${e.id}')">삭제</button></div>`;
+      }).join('') : '<p class="muted">이 달 일정이 없습니다.</p>';
     }
     // ----- 질문하기 (자료 근거 RAG 챗봇) -----
     const CHAT_MODEL="claude-haiku-4-5-20251001";
@@ -1011,14 +1039,17 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime,
       calEl('chat-pw').addEventListener('keydown',e=>{if(e.key==='Enter')calEl('chat-login-btn').click();});
       calEl('chat-logout').onclick=()=>fbAuth.signOut();
       calEl('chat-key-save').onclick=saveChatKey;
+      calEl('chat-key-edit').onclick=()=>{calEl('chat-key-box').style.display='flex';};
       calEl('chat-send').onclick=sendChat;
       calEl('chat-input').addEventListener('keydown',e=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendChat(); }});
     }
     function loadChatKey(){
       fbDB.ref('secure/anthropicKey').once('value').then(s=>{
         chatKey=s.val()||"";
-        calEl('chat-key-status').textContent = chatKey? '✅ API 키 등록됨' : '⚠ API 키 미등록 — 아래에 입력해 저장하세요';
-        calEl('chat-key-box').style.display = chatKey? 'none':'block';
+        const last4=chatKey?chatKey.slice(-4):'';
+        calEl('chat-key-status').textContent = chatKey? `✅ API 키 등록됨 (••••${last4})` : '⚠ API 키 미등록 — 아래에 입력해 저장하세요';
+        calEl('chat-key-box').style.display = chatKey? 'none':'flex';
+        calEl('chat-key-edit').style.display = chatKey? 'inline':'none';
       }).catch(e=>{ calEl('chat-key-status').textContent='키 확인 오류(보안 규칙 확인): '+e.message; });
     }
     function saveChatKey(){
@@ -1141,7 +1172,8 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime,
         "<div id='cal-legend' class='cal-legend'></div>"
         "<div class='cal-nav'><button id='cal-prev' class='cal-link'>‹ 이전</button>"
         "<b id='cal-label'></b><button id='cal-next' class='cal-link'>다음 ›</button></div>"
-        "<div id='cal-grid' class='cal-grid'></div></div>"
+        "<div id='cal-grid' class='cal-grid'></div>"
+        "<div class='cal-agenda-h'>이 달 일정</div><div id='cal-agenda' class='cal-agenda'></div></div>"
         "</div>"
         # ===== 질문하기 (좌측 하단 플로팅) =====
         "<button id='chat-fab' class='chat-fab' aria-label='질문하기' title='질문하기'>💬</button>"
@@ -1158,7 +1190,8 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime,
         "<div id='chat-err' class='cal-err'></div></div>"
         "<div id='chat-app' style='display:none'>"
         "<div class='cal-bar'><span id='chat-key-status' class='muted'></span>"
-        "<button id='chat-logout' class='cal-link'>로그아웃</button></div>"
+        "<span><button id='chat-key-edit' class='cal-link' style='display:none'>키 변경</button> "
+        "<button id='chat-logout' class='cal-link'>로그아웃</button></span></div>"
         "<div id='chat-key-box' style='display:none' class='chat-keybox'>"
         "<input id='chat-key-input' type='password' placeholder='Anthropic API 키 (sk-ant-...)'>"
         "<button id='chat-key-save' class='cal-btn'>키 저장</button>"

@@ -82,6 +82,19 @@ CONFIG = {
          "kind": "page",
          "url": "https://www.nrc.go.kr/portal/html/content.do?depth=dc&menu_cd=06_02_02"},
     ],
+
+    # --- 공유 캘린더 (Firebase) ---
+    # Firebase 콘솔 > 프로젝트 설정 > '웹 앱' 의 firebaseConfig 값을 그대로 채우세요.
+    # 웹 config는 공개돼도 안전합니다(보안은 Realtime DB '보안 규칙' + 로그인으로 합니다).
+    # 비워두면 캘린더 탭에 설정 안내가 표시되고, 나머지 기능은 정상 동작합니다.
+    "firebase_config": {
+        # "apiKey": "...",
+        # "authDomain": "your-project.firebaseapp.com",
+        # "databaseURL": "https://your-project-default-rtdb.firebaseio.com",
+        # "projectId": "your-project",
+        # "appId": "...",
+    },
+    "calendar_categories": ["인지", "운동", "자조", "언어", "병원", "기타"],
 }
 
 # 연구 '영역(domain)'별 검색 스트림. 영역을 추가/수정하려면 여기만 고치면 됩니다.
@@ -602,6 +615,12 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime,
         })
     res_json = json.dumps(res_slim, ensure_ascii=False).replace("</", "<\\/")
 
+    # 캘린더(Firebase) 설정
+    fb_cfg = {k: v for k, v in CONFIG.get("firebase_config", {}).items() if v}
+    fb_json = json.dumps(fb_cfg, ensure_ascii=False) if fb_cfg else "null"
+    cats_json = json.dumps(CONFIG.get("calendar_categories", []), ensure_ascii=False)
+    fb_enabled = bool(fb_cfg)
+
     def esc(x):
         return html.escape(str(x or ""))
 
@@ -669,6 +688,28 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime,
     .secbtn .n{font-family:'Noto Sans KR';font-size:.72rem;opacity:.7}
     .res-intro{color:var(--muted);font-size:.86rem;margin:14px 0 16px}
     .src-res{background:#8a6d3b}
+    .cal-setup,.cal-login{background:#fff;border:1px solid var(--line);border-radius:12px;padding:22px;margin-top:18px;max-width:420px}
+    .cal-login input{display:block;width:100%;box-sizing:border-box;margin:8px 0;padding:10px 12px;border:1px solid var(--line);border-radius:8px;font-family:inherit;font-size:.95rem}
+    .cal-btn{font-family:inherit;font-weight:600;padding:9px 18px;border:none;border-radius:8px;background:var(--accent);color:#fff;cursor:pointer}
+    .cal-link{font-family:inherit;border:none;background:none;color:var(--accent);cursor:pointer;font-size:.9rem}
+    .cal-err{color:#e05c5c;font-size:.85rem;margin-top:8px;min-height:1em}
+    .cal-bar{display:flex;justify-content:space-between;align-items:center;margin:16px 0 8px;font-size:.86rem}
+    .cal-form{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0 14px}
+    .cal-form input,.cal-form select{padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-family:inherit;font-size:.9rem}
+    .cal-form #cal-title{flex:1;min-width:140px}.cal-form #cal-memo{flex:1;min-width:140px}
+    .cal-legend{display:flex;flex-wrap:wrap;gap:12px;margin:6px 0 12px;font-size:.8rem;color:var(--muted)}
+    .cal-lg{display:inline-flex;align-items:center;gap:5px}.cal-lg i{width:11px;height:11px;border-radius:3px;display:inline-block}
+    .cal-nav{display:flex;justify-content:space-between;align-items:center;margin:6px 0 10px;font-family:'Lora',serif;font-size:1.1rem}
+    .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:5px}
+    .cal-dow{text-align:center;font-size:.78rem;color:var(--muted);padding:4px 0;font-weight:500}
+    .cal-cell{min-height:84px;border:1px solid var(--line);border-radius:8px;padding:5px;background:#fff;overflow:hidden}
+    .cal-empty{background:transparent;border:none}
+    .cal-today{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+    .cal-d{font-size:.78rem;color:var(--muted);margin-bottom:3px}
+    .cal-ev{display:flex;justify-content:space-between;align-items:center;gap:3px;color:#fff;font-size:.72rem;border-radius:5px;padding:2px 5px;margin-bottom:3px;line-height:1.25}
+    .cal-ev span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .cal-del{border:none;background:rgba(0,0,0,.18);color:#fff;border-radius:4px;cursor:pointer;font-size:.7rem;line-height:1;padding:1px 4px}
+    @media(max-width:640px){.cal-cell{min-height:62px}.cal-ev{font-size:.66rem}}
     .domains{display:flex;gap:7px;flex-wrap:wrap;margin:18px 0 4px}
     .dombtn{font-family:inherit;font-size:.86rem;font-weight:500;padding:8px 15px;border:1px solid var(--line);background:#fff;border-radius:9px;cursor:pointer;color:var(--ink)}
     .dombtn:hover{border-color:var(--accent)}
@@ -693,6 +734,8 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime,
     const ITEMS = __DATA__;
     const DOMAINS = __DOMAINS__;
     const RESOURCES = __RESOURCES__;
+    const FB = __FIREBASE__;
+    const CATS = __CATS__;
     const PAGE = 30;
     const TOPIC_ORDER=['유전·진단','성장·발달','신경·인지·행동','종양·감시','합병증·동반질환','치료·관리','기전·기초연구','기타','미분류'];
     const STAGE_ORDER=['리뷰','관찰연구','초기임상','후기임상','전임상','사례보고','기타','미분석'];
@@ -785,21 +828,19 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime,
     typeEl.addEventListener('change',()=>{typeF=typeEl.value;shown=PAGE;render();});
     yearEl.addEventListener('change',()=>{yearF=yearEl.value;shown=PAGE;render();});
     moreEl.addEventListener('click',()=>{shown+=PAGE;render();});
-    // ----- 상단 섹션 전환 (연구 / 국내 실용자료) -----
-    const secResearch=document.getElementById('sec-research');
-    const secResources=document.getElementById('sec-resources');
+    // ----- 상단 섹션 전환 (연구 / 국내 실용자료 / 캘린더) -----
     const sectionsEl=document.getElementById('sections');
+    const SECS=[['research','연구',''],['resources','국내 실용자료',RESOURCES.length],['calendar','캘린더','']];
+    let calInited=false;
+    function showSection(key){
+      sectionsEl.querySelectorAll('.secbtn').forEach(x=>x.classList.toggle('active',x.dataset.s===key));
+      SECS.forEach(([k])=>{const el=document.getElementById('sec-'+k); if(el) el.style.display=(k===key?'block':'none');});
+      if(key==='calendar' && !calInited){calInited=true; initCalendar();}
+    }
     function buildSections(){
-      sectionsEl.innerHTML=
-        `<button class="secbtn active" data-s="research">연구</button>`+
-        `<button class="secbtn" data-s="resources">국내 실용자료 <span class="n">${RESOURCES.length}</span></button>`;
-      sectionsEl.querySelectorAll('.secbtn').forEach(b=>b.onclick=()=>{
-        sectionsEl.querySelectorAll('.secbtn').forEach(x=>x.classList.remove('active'));
-        b.classList.add('active');
-        const r=b.dataset.s==='research';
-        secResearch.style.display=r?'block':'none';
-        secResources.style.display=r?'none':'block';
-      });
+      sectionsEl.innerHTML=SECS.map(([k,label,n])=>
+        `<button class="secbtn${k==='research'?' active':''}" data-s="${k}">${esc(label)}${n!==''?` <span class="n">${n}</span>`:''}</button>`).join('');
+      sectionsEl.querySelectorAll('.secbtn').forEach(b=>b.onclick=()=>showSection(b.dataset.s));
     }
     function renderResources(){
       const el=document.getElementById('reslist');
@@ -816,6 +857,72 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime,
           `<h3><a href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.title)}</a></h3>${body}</article>`;
       }).join('');
     }
+    // ----- 공유 캘린더 (Firebase) -----
+    const CATCOLOR={'인지':'#5b8def','운동':'#2bb673','자조':'#e8923b','언어':'#9b6fd6','병원':'#e05c5c','기타':'#8a8f99'};
+    let fbAuth=null, fbDB=null, calUser=null, calEvents={}, calMonth=new Date();
+    function calEl(id){return document.getElementById(id);}
+    function initCalendar(){
+      const setup=calEl('cal-setup'), login=calEl('cal-login'), app=calEl('cal-app');
+      if(!FB){ setup.style.display='block'; login.style.display='none'; app.style.display='none'; return; }
+      setup.style.display='none';
+      try{
+        if(!firebase.apps.length) firebase.initializeApp(FB);
+        fbAuth=firebase.auth(); fbDB=firebase.database();
+      }catch(e){ setup.style.display='block'; setup.innerHTML='<p class="muted">Firebase 초기화 오류: '+esc(e.message)+'</p>'; return; }
+      fbAuth.onAuthStateChanged(u=>{
+        calUser=u;
+        if(u){ login.style.display='none'; app.style.display='block'; calEl('cal-who').textContent=u.email; subscribeCal(); buildCatOptions(); }
+        else { login.style.display='block'; app.style.display='none'; }
+      });
+      calEl('cal-login-btn').onclick=()=>{
+        const em=calEl('cal-email').value.trim(), pw=calEl('cal-pw').value;
+        calEl('cal-err').textContent='';
+        fbAuth.signInWithEmailAndPassword(em,pw).catch(e=>{calEl('cal-err').textContent='로그인 실패: '+e.message;});
+      };
+      calEl('cal-pw').addEventListener('keydown',e=>{if(e.key==='Enter')calEl('cal-login-btn').click();});
+      calEl('cal-logout').onclick=()=>fbAuth.signOut();
+      calEl('cal-prev').onclick=()=>{calMonth.setMonth(calMonth.getMonth()-1);renderCal();};
+      calEl('cal-next').onclick=()=>{calMonth.setMonth(calMonth.getMonth()+1);renderCal();};
+      calEl('cal-add').onclick=addEventFromForm;
+    }
+    function buildCatOptions(){
+      calEl('cal-cat').innerHTML=CATS.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
+    }
+    function subscribeCal(){
+      fbDB.ref('calendar/events').on('value',snap=>{calEvents=snap.val()||{};renderCal();},
+        err=>{calEl('cal-app').insertAdjacentHTML('afterbegin','<p class="muted">읽기 권한 오류(보안 규칙 확인): '+esc(err.message)+'</p>');});
+    }
+    function addEventFromForm(){
+      const date=calEl('cal-date').value, time=calEl('cal-time').value, title=calEl('cal-title').value.trim(), cat=calEl('cal-cat').value, memo=calEl('cal-memo').value.trim();
+      if(!date||!title){alert('날짜와 제목은 필수입니다.');return;}
+      fbDB.ref('calendar/events').push({date,time,title,cat,memo,by:calUser.email,ts:Date.now()})
+        .then(()=>{calEl('cal-title').value='';calEl('cal-memo').value='';})
+        .catch(e=>alert('저장 실패(권한 확인): '+e.message));
+    }
+    function delEvent(id){ if(confirm('이 일정을 삭제할까요?')) fbDB.ref('calendar/events/'+id).remove().catch(e=>alert('삭제 실패: '+e.message)); }
+    window.__delEvent=delEvent;
+    function ymd(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+    function renderCal(){
+      const y=calMonth.getFullYear(), m=calMonth.getMonth();
+      calEl('cal-label').textContent=`${y}년 ${m+1}월`;
+      const byDate={};
+      Object.keys(calEvents).forEach(id=>{const e=calEvents[id]; (byDate[e.date]=byDate[e.date]||[]).push({id,...e});});
+      const first=new Date(y,m,1), start=first.getDay(), days=new Date(y,m+1,0).getDate(), today=ymd(new Date());
+      let cells='';
+      for(let i=0;i<start;i++) cells+='<div class="cal-cell cal-empty"></div>';
+      for(let d=1;d<=days;d++){
+        const ds=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+        const evs=(byDate[ds]||[]).sort((a,b)=>(a.time||'').localeCompare(b.time||''));
+        const chips=evs.map(e=>`<div class="cal-ev" style="background:${CATCOLOR[e.cat]||'#8a8f99'}" title="${esc(e.title)} ${esc(e.memo||'')} (${esc(e.by||'')})">`+
+          `<span>${e.time?esc(e.time)+' ':''}${esc(e.title)}</span>`+
+          `<button class="cal-del" onclick="__delEvent('${e.id}')">×</button></div>`).join('');
+        cells+=`<div class="cal-cell${ds===today?' cal-today':''}"><div class="cal-d">${d}</div>${chips}</div>`;
+      }
+      calEl('cal-grid').innerHTML=
+        '<div class="cal-dow">일</div><div class="cal-dow">월</div><div class="cal-dow">화</div><div class="cal-dow">수</div><div class="cal-dow">목</div><div class="cal-dow">금</div><div class="cal-dow">토</div>'+cells;
+      // 카테고리 범례
+      calEl('cal-legend').innerHTML=CATS.map(c=>`<span class="cal-lg"><i style="background:${CATCOLOR[c]||'#8a8f99'}"></i>${esc(c)}</span>`).join('');
+    }
     buildSections();
     renderResources();
     buildDomains();
@@ -825,7 +932,9 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime,
     """
     js = (js.replace("__DATA__", data_json)
             .replace("__DOMAINS__", json.dumps(DOMAIN_LABELS, ensure_ascii=False))
-            .replace("__RESOURCES__", res_json))
+            .replace("__RESOURCES__", res_json)
+            .replace("__FIREBASE__", fb_json)
+            .replace("__CATS__", cats_json))
 
     return (
         "<!DOCTYPE html><html lang='ko'><head><meta charset='utf-8'>"
@@ -854,8 +963,35 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime,
         "<div id='sec-resources' style='display:none'>"
         "<p class='res-intro'>국내 공식 사이트에서 robots.txt를 지키며 모은 실용 자료입니다. 원문 확인은 각 링크에서.</p>"
         "<div id='reslist'></div></div>"
+        "<div id='sec-calendar' style='display:none'>"
+        "<div id='cal-setup' style='display:none' class='cal-setup'>"
+        "<b>공유 캘린더를 쓰려면 Firebase 설정이 필요합니다.</b><br>"
+        "스크립트 CONFIG의 <code>firebase_config</code>에 Firebase 웹 앱 설정을 넣고, Realtime Database 보안 규칙으로 두 분만 접근하도록 잠그세요. 자세한 절차는 대화의 안내를 참고하세요.</div>"
+        "<div id='cal-login' style='display:none' class='cal-login'>"
+        "<h3>로그인</h3><p class='muted'>두 분만 접근할 수 있는 비공개 일정입니다.</p>"
+        "<input id='cal-email' type='email' placeholder='이메일' autocomplete='username'>"
+        "<input id='cal-pw' type='password' placeholder='비밀번호' autocomplete='current-password'>"
+        "<button id='cal-login-btn' class='cal-btn'>로그인</button>"
+        "<div id='cal-err' class='cal-err'></div></div>"
+        "<div id='cal-app' style='display:none'>"
+        "<div class='cal-bar'><span class='muted'>로그인: <b id='cal-who'></b></span>"
+        "<button id='cal-logout' class='cal-link'>로그아웃</button></div>"
+        "<div class='cal-form'>"
+        "<input id='cal-date' type='date'><input id='cal-time' type='time'>"
+        "<select id='cal-cat'></select>"
+        "<input id='cal-title' placeholder='일정 (예: 인지치료)'>"
+        "<input id='cal-memo' placeholder='메모 (선택)'>"
+        "<button id='cal-add' class='cal-btn'>추가</button></div>"
+        "<div id='cal-legend' class='cal-legend'></div>"
+        "<div class='cal-nav'><button id='cal-prev' class='cal-link'>‹ 이전</button>"
+        "<b id='cal-label'></b><button id='cal-next' class='cal-link'>다음 ›</button></div>"
+        "<div id='cal-grid' class='cal-grid'></div></div>"
+        "</div>"
         "<footer>누적 기록: data/knowledge_base.jsonl · data/resources.jsonl · 설정은 스크립트 CONFIG · v3.0</footer>"
-        f"<script>{js}</script></div></body></html>"
+        + (("<script src='https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js'></script>"
+            "<script src='https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js'></script>"
+            "<script src='https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js'></script>") if fb_enabled else "")
+        + f"<script>{js}</script></div></body></html>"
     )
 
 

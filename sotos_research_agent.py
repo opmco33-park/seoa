@@ -88,11 +88,14 @@ CONFIG = {
     # 웹 config는 공개돼도 안전합니다(보안은 Realtime DB '보안 규칙' + 로그인으로 합니다).
     # 비워두면 캘린더 탭에 설정 안내가 표시되고, 나머지 기능은 정상 동작합니다.
     "firebase_config": {
-        # "apiKey": "...",
-        # "authDomain": "your-project.firebaseapp.com",
-        # "databaseURL": "https://your-project-default-rtdb.firebaseio.com",
-        # "projectId": "your-project",
-        # "appId": "...",
+        "apiKey": "AIzaSyDKvgNklNcWXGsibeE1vnVStSYMAfLfX5M",
+        "authDomain": "seoa-b44b4.firebaseapp.com",
+        "databaseURL": "https://seoa-b44b4-default-rtdb.asia-southeast1.firebasedatabase.app",
+        "projectId": "seoa-b44b4",
+        "storageBucket": "seoa-b44b4.firebasestorage.app",
+        "messagingSenderId": "214737228161",
+        "appId": "1:214737228161:web:fe4f733af7ac779a7e5880",
+        "measurementId": "G-30S7S7T6K7",
     },
     "calendar_categories": ["인지", "운동", "자조", "언어", "병원", "기타"],
 }

@@ -1,0 +1,46 @@
+# 이 파일은 저장소의  .github/workflows/research.yml  경로에 두세요.
+# (폴더가 없으면 새로 만드세요: .github 안에 workflows 폴더)
+
+name: Sotos Research Agent
+
+on:
+  schedule:
+    # UTC 기준입니다. UTC 21:00 = 한국시간(KST) 06:00. 매일 아침 자동 실행.
+    # (깃허브 예약은 혼잡 시 10~30분 지연될 수 있으나 문헌 추적엔 무관합니다.)
+    - cron: "0 21 * * *"
+  workflow_dispatch:   # 저장소 Actions 탭에서 수동으로 "Run workflow" 버튼 제공
+
+# 결과(데이터·대시보드)를 저장소에 다시 커밋하려면 쓰기 권한이 필요합니다.
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v4
+
+      - name: 파이썬 설치
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 의존성 설치
+        run: pip install requests
+
+      - name: 에이전트 실행 (평소=증분 모드)
+        env:
+          # 아래 키는 저장소 Secrets에 등록한 값이 자동 주입됩니다. 코드엔 키가 없습니다.
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python sotos_research_agent.py
+
+      - name: 결과 커밋 & 푸시
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data docs
+          # 변경이 있을 때만 커밋(없으면 조용히 통과). 이 커밋이 저장소 '활동'이 되어
+          # 60일 비활성 자동중지도 예방됩니다(자가 유지).
+          git diff --staged --quiet || git commit -m "연구 데이터 자동 갱신 $(date -u +%Y-%m-%d)"
+          git push

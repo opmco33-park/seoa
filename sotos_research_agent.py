@@ -112,6 +112,14 @@ def append_kb(items: list):
             f.write(json.dumps(it, ensure_ascii=False) + "\n")
 
 
+def write_kb(items: list):
+    """지식베이스 전체를 다시 씀 (주제 꼬리표 갱신 등 기존 항목 수정용)."""
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    with KB_PATH.open("w", encoding="utf-8") as f:
+        for it in items:
+            f.write(json.dumps(it, ensure_ascii=False) + "\n")
+
+
 def load_kb() -> list:
     """누적 지식베이스 전체를 읽어 대시보드 렌더링에 사용."""
     if not KB_PATH.exists():
@@ -247,19 +255,31 @@ def fetch_trials(lookback_days: int) -> list:
 # ==========================================================================
 ANTHROPIC_URL = "https://api.anthropic.com/v1/messages"
 
+# 주제 분류 체계 (CONFIG처럼 자유롭게 수정 가능). 탭 표시 순서이기도 함.
+TOPICS = ["유전·진단", "성장·발달", "신경·인지·행동", "종양·감시",
+          "합병증·동반질환", "치료·관리", "기전·기초연구", "기타"]
+_TOPICS_STR = ", ".join(TOPICS)
+
 SUMMARY_SYSTEM = """당신은 희귀 유전질환(Sotos 증후군 / NSD1 유전자) 아이를 둔 보호자가
 의학 연구 자료를 이해하도록 돕는 '요약 보조자'입니다. 규칙을 반드시 지키세요.
 1. 진단·치료 권고·복용 지시 금지. 당신은 의료진이 아닙니다.
 2. 제공된 원문에 실제로 있는 내용만. 추측·창작 금지.
 3. 연구 단계를 구분: 리뷰/관찰연구/전임상/초기임상/후기임상/사례보고/기타.
 4. 정보가 부족하면 솔직히 "원문에 정보 부족"이라고 표기.
-5. 한국어. 아래 JSON '하나만' 출력(설명·마크다운·코드펜스 금지).
+5. 주제는 다음 중 가장 알맞은 하나만: """ + _TOPICS_STR + """.
+6. 한국어. 아래 JSON '하나만' 출력(설명·마크다운·코드펜스 금지).
 {
   "summary_3lines": "핵심을 3문장 이내로",
   "study_stage": "리뷰|관찰연구|전임상|초기임상|후기임상|사례보고|기타 중 하나",
+  "topic": "위 주제 목록 중 하나",
   "relevance": "Sotos/NSD1 보호자에게 왜 중요한지 1~2문장(없으면 '직접 관련성 낮음')",
   "questions_for_doctor": ["담당 의료진에게 물어볼 질문 1~3개"]
 }"""
+
+CLASSIFY_SYSTEM = """다음 Sotos/NSD1 논문·임상 목록을 각각 가장 알맞은 주제 하나로 분류하세요.
+허용 주제(이 중 하나만): """ + _TOPICS_STR + """.
+규칙: 각 항목 머리의 id에 주제를 매칭. 판단이 어려우면 '기타'. 주제명은 한국어 그대로.
+출력은 JSON 객체 하나만(코드펜스·설명 금지): {"항목id": "주제", ...}"""
 
 
 def _call_anthropic(api_key, system, user, max_tokens):
@@ -288,6 +308,21 @@ def ai_summarize(item: dict, api_key: str) -> dict | None:
     except Exception as e:
         log(f"  ! 항목 요약 실패({e}) - 원문만: {item['id']}")
         return None
+
+
+def ai_classify_batch(batch: list, api_key: str) -> dict:
+    """여러 항목을 한 번에 주제 분류. {id: topic} 반환. 비용 절감 위해 묶음 처리."""
+    lines = []
+    for it in batch:
+        ai = it.get("ai") or {}
+        lines.append(f"[{it['id']}] {it.get('title','')} — {ai.get('summary_3lines','')[:200]}")
+    user = "분류할 목록:\n" + "\n".join(lines)
+    try:
+        result = _parse_json_loose(_call_anthropic(api_key, CLASSIFY_SYSTEM, user, 1024))
+        return result if isinstance(result, dict) else {}
+    except Exception as e:
+        log(f"  ! 묶음 분류 실패({e})")
+        return {}
 
 
 # ==========================================================================
@@ -364,6 +399,7 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime)
             "meta": it.get("meta", {}),
             "summary": ai.get("summary_3lines", ""),
             "stage": ai.get("study_stage", ""),
+            "topic": ai.get("topic", ""),
             "relevance": ai.get("relevance", ""),
             "questions": ai.get("questions_for_doctor", []),
             "has_ai": bool(it.get("ai")),
@@ -423,6 +459,7 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime)
     .src{font-size:.68rem;font-weight:700;letter-spacing:.03em;padding:3px 8px;border-radius:6px;color:#fff}
     .src-pubmed{background:var(--pub)}.src-trial{background:var(--trial)}
     .badge{font-size:.7rem;background:var(--soft);color:var(--accent);padding:3px 8px;border-radius:6px}
+    .badge-topic{background:#eef2f4;color:var(--pub)}
     .item h3{font-size:1rem;margin:3px 0 5px;line-height:1.45}
     .item h3 a{color:var(--ink);text-decoration:none}.item h3 a:hover{color:var(--accent);text-decoration:underline}
     .meta{color:var(--muted);font-size:.8rem;margin:0 0 9px}
@@ -430,7 +467,12 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime)
     .qbox{background:var(--soft);border-radius:8px;padding:9px 13px;font-size:.86rem}
     .qbox ul{margin:4px 0 0;padding-left:17px}
     .muted{color:var(--muted)}
-    .tabs{display:flex;gap:7px;flex-wrap:wrap;margin:22px 0 12px}
+    .axis{display:flex;margin:20px 0 6px}
+    .axbtn{font-family:inherit;font-size:.82rem;padding:6px 16px;border:1px solid var(--line);background:#fff;cursor:pointer;color:var(--muted)}
+    .axbtn:first-child{border-radius:9px 0 0 9px}
+    .axbtn:last-child{border-radius:0 9px 9px 0;border-left:none}
+    .axbtn.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+    .tabs{display:flex;gap:7px;flex-wrap:wrap;margin:6px 0 12px}
     .tab{font-family:inherit;font-size:.84rem;padding:7px 13px;border:1px solid var(--line);background:#fff;border-radius:20px;cursor:pointer;color:var(--ink)}
     .tab:hover{border-color:var(--accent)}
     .tab.active{background:var(--accent);color:#fff;border-color:var(--accent)}
@@ -443,36 +485,49 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime)
     js = """
     const ITEMS = __DATA__;
     const PAGE = 30;
-    let stageF='전체', typeF='all', yearF='all', shown=PAGE;
+    const TOPIC_ORDER=['유전·진단','성장·발달','신경·인지·행동','종양·감시','합병증·동반질환','치료·관리','기전·기초연구','기타','미분류'];
+    const STAGE_ORDER=['리뷰','관찰연구','초기임상','후기임상','전임상','사례보고','기타','미분석'];
+    let axis='topic', tabVal='전체', typeF='all', yearF='all', shown=PAGE;
     const listEl=document.getElementById('list');
     const countEl=document.getElementById('countbar');
     const tabsEl=document.getElementById('tabs');
+    const axisEl=document.getElementById('axis');
     const qEl=document.getElementById('q');
     const typeEl=document.getElementById('type');
     const yearEl=document.getElementById('year');
     const moreEl=document.getElementById('more');
     function esc(s){const d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML;}
     function stageOf(it){return it.has_ai && it.stage ? it.stage : '미분석';}
+    function topicOf(it){return it.has_ai && it.topic ? it.topic : '미분류';}
+    function keyOf(it){return axis==='topic' ? topicOf(it) : stageOf(it);}
+    function orderFor(){return axis==='topic' ? TOPIC_ORDER : STAGE_ORDER;}
     function yearOf(it){return String(it.date||'').slice(0,4);}
-    const ORDER=['리뷰','관찰연구','초기임상','후기임상','전임상','사례보고','기타','미분석'];
-    const stageCounts={};
-    ITEMS.forEach(it=>{const s=stageOf(it);stageCounts[s]=(stageCounts[s]||0)+1;});
-    const stages=Object.keys(stageCounts).sort((a,b)=>{
-      const ia=ORDER.indexOf(a),ib=ORDER.indexOf(b);return (ia<0?99:ia)-(ib<0?99:ib);});
     const years=[...new Set(ITEMS.map(yearOf).filter(Boolean))].sort().reverse();
     yearEl.innerHTML="<option value='all'>전체 연도</option>"+years.map(y=>`<option value="${y}">${y}</option>`).join('');
+    function buildAxis(){
+      axisEl.innerHTML=
+        `<button class="axbtn${axis==='topic'?' active':''}" data-a="topic">주제별</button>`+
+        `<button class="axbtn${axis==='stage'?' active':''}" data-a="stage">단계별</button>`;
+      axisEl.querySelectorAll('.axbtn').forEach(b=>b.onclick=()=>{
+        axis=b.dataset.a; tabVal='전체'; shown=PAGE; buildAxis(); buildTabs(); render();});
+    }
     function buildTabs(){
-      let h=`<button class="tab${stageF==='전체'?' active':''}" data-s="전체">전체 <span class="n">${ITEMS.length}</span></button>`;
-      h+=stages.map(s=>`<button class="tab${stageF===s?' active':''}" data-s="${esc(s)}">${esc(s)} <span class="n">${stageCounts[s]}</span></button>`).join('');
+      const counts={}; ITEMS.forEach(it=>{const k=keyOf(it);counts[k]=(counts[k]||0)+1;});
+      const order=orderFor();
+      const keys=Object.keys(counts).sort((a,b)=>{
+        const ia=order.indexOf(a),ib=order.indexOf(b);return (ia<0?99:ia)-(ib<0?99:ib);});
+      let h=`<button class="tab${tabVal==='전체'?' active':''}" data-v="전체">전체 <span class="n">${ITEMS.length}</span></button>`;
+      h+=keys.map(k=>`<button class="tab${tabVal===k?' active':''}" data-v="${esc(k)}">${esc(k)} <span class="n">${counts[k]}</span></button>`).join('');
       tabsEl.innerHTML=h;
-      tabsEl.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{stageF=b.dataset.s;shown=PAGE;buildTabs();render();});
+      tabsEl.querySelectorAll('.tab').forEach(b=>b.onclick=()=>{tabVal=b.dataset.v;shown=PAGE;buildTabs();render();});
     }
     function card(it){
       const src = it.type==='pubmed' ? 'PubMed' : 'ClinicalTrials.gov';
       const meta = it.type==='pubmed'
         ? `${esc(it.meta.journal||'')} · ${esc(it.meta.authors||'')} · ${esc(it.date)}`
         : `상태:${esc(it.meta.status||'')} · 단계:${esc(it.meta.phase||'')} · 갱신:${esc(it.date)}`;
-      const badge = it.stage ? `<span class="badge">${esc(it.stage)}</span>` : '';
+      const badge = (it.stage?`<span class="badge">${esc(it.stage)}</span>`:'')
+                  + (it.topic?`<span class="badge badge-topic">${esc(it.topic)}</span>`:'');
       let body;
       if(it.has_ai){
         const qs = (it.questions||[]).map(q=>`<li>${esc(q)}</li>`).join('');
@@ -489,7 +544,7 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime)
     function filtered(){
       const q=qEl.value.trim().toLowerCase();
       return ITEMS.filter(it=>{
-        if(stageF!=='전체' && stageOf(it)!==stageF) return false;
+        if(tabVal!=='전체' && keyOf(it)!==tabVal) return false;
         if(typeF!=='all' && it.type!==typeF) return false;
         if(yearF!=='all' && yearOf(it)!==yearF) return false;
         if(q && !((it.title+' '+it.summary+' '+it.relevance).toLowerCase().includes(q))) return false;
@@ -508,6 +563,7 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime)
     typeEl.addEventListener('change',()=>{typeF=typeEl.value;shown=PAGE;render();});
     yearEl.addEventListener('change',()=>{yearF=yearEl.value;shown=PAGE;render();});
     moreEl.addEventListener('click',()=>{shown+=PAGE;render();});
+    buildAxis();
     buildTabs();
     render();
     """
@@ -525,6 +581,7 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime)
         "<div class='disclaimer'><b>읽기 전에.</b> 검색·정리를 돕는 도구가 만든 자료입니다. "
         "요약·분석은 부정확할 수 있으며 진단·치료 판단이 아닙니다. <b>모든 내용은 원문과 담당 의료진을 통해 확인</b>하세요.</div>"
         f"{synth_html}"
+        "<div class='axis' id='axis'></div>"
         "<div class='tabs' id='tabs'></div>"
         "<div class='controls'><input id='q' placeholder='검색어 (제목·요약 내)'>"
         "<select id='type'><option value='all'>전체 종류</option>"
@@ -547,13 +604,13 @@ DEMO_ITEMS = [
      "raw_text": "Sample abstract for offline preview.",
      "ai": {"summary_3lines": "샘플 요약입니다.", "study_stage": "사례보고",
             "relevance": "오프라인 미리보기용 예시입니다.",
-            "questions_for_doctor": ["이 변이 유형이 우리 아이와 관련 있나요?"]}},
+            "questions_for_doctor": ["이 변이 유형이 우리 아이와 관련 있나요?"], "topic": "유전·진단"}},
     {"type": "trial", "id": "NCTDEMO", "title": "Sample: Growth patterns in Sotos syndrome",
      "url": "https://clinicaltrials.gov/", "date": "2026-05-01",
      "meta": {"status": "RECRUITING", "phase": "N/A", "conditions": "Sotos Syndrome"},
      "raw_text": "Sample summary.",
      "ai": {"summary_3lines": "샘플 임상시험 요약.", "study_stage": "관찰연구",
-            "relevance": "예시.", "questions_for_doctor": ["참여 조건이 궁금합니다."]}},
+            "relevance": "예시.", "questions_for_doctor": ["참여 조건이 궁금합니다."], "topic": "성장·발달"}},
 ]
 DEMO_SYNTH = {"overview": "이것은 오프라인 미리보기용 샘플 종합 분석입니다.",
               "themes": [{"title": "유전형-표현형", "detail": "샘플 주제 설명."},
@@ -586,6 +643,39 @@ def main():
         log("DEMO 모드: 샘플로 대시보드만 생성합니다.")
         INDEX_PATH.write_text(render_dashboard(DEMO_ITEMS, DEMO_SYNTH, run_time), encoding="utf-8")
         log(f"대시보드 생성 → {INDEX_PATH}")
+        return
+
+    # ----- 기존 항목 주제 분류 (일회성) -----
+    if "--retag" in sys.argv:
+        api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+        if not api_key:
+            log("! ANTHROPIC_API_KEY가 필요합니다 (--retag).")
+            return
+        items = load_kb()
+        todo = [it for it in items if it.get("ai") and not (it["ai"] or {}).get("topic")]
+        log(f"주제 분류 대상: {len(todo)}건 (이미 분류된 항목은 건너뜀)")
+        id2topic = {}
+        bs = 20
+        for start in range(0, len(todo), bs):
+            res = ai_classify_batch(todo[start:start + bs], api_key)
+            for k, v in res.items():
+                id2topic[str(k)] = v if v in TOPICS else "기타"
+            log(f"  분류 진행: {min(start + bs, len(todo))}/{len(todo)}")
+            time.sleep(0.5)
+        applied = 0
+        for it in items:
+            t = id2topic.get(str(it["id"]))
+            if t and it.get("ai"):
+                it["ai"]["topic"] = t
+                applied += 1
+        write_kb(items)
+        log(f"주제 분류 적용: {applied}건")
+        synth = None
+        if SYNTH_PATH.exists():
+            try: synth = json.loads(SYNTH_PATH.read_text(encoding="utf-8"))
+            except Exception: synth = None
+        INDEX_PATH.write_text(render_dashboard(items, synth, run_time), encoding="utf-8")
+        log(f"대시보드 재발행 → {INDEX_PATH}  (전체 {len(items)}건)")
         return
 
     backfill = "--backfill" in sys.argv

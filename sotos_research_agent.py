@@ -726,9 +726,15 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime,
     .chat-close{border:none;background:none;font-size:1.4rem;line-height:1;cursor:pointer;color:var(--muted)}
     .chat-body{padding:14px 16px;overflow-y:auto}
     @media(max-width:480px){.chat-panel{right:4vw;width:92vw;bottom:84px}}
+    .home-hero{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin:6px 0 4px}
+    .home-title{font-family:'Lora',serif;font-size:1.4rem;color:var(--ink)}
+    .home-upcoming{background:var(--soft);border-radius:12px;padding:12px 14px;margin:12px 0;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+    .home-upcoming .up-h{flex-basis:100%;font-size:.78rem;font-weight:700;color:var(--muted);margin-bottom:2px}
+    .up-chip{display:inline-flex;align-items:center;gap:6px;background:#fff;border:1px solid var(--line);border-radius:20px;padding:5px 11px;font-size:.82rem}
+    .up-chip i{width:9px;height:9px;border-radius:50%;display:inline-block}
     .chat-keybox{background:var(--soft);border-radius:10px;padding:12px 14px;margin:10px 0;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
     .chat-keybox input{flex:1;min-width:160px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;font-family:inherit}
-    .chat-log{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px;min-height:160px;max-height:320px;overflow-y:auto;margin:10px 0}
+    .chat-log{background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:14px;min-height:240px;max-height:52vh;overflow-y:auto;margin:10px 0}
     .ch-msg{margin:10px 0;display:flex;flex-direction:column}
     .ch-user{align-items:flex-end}.ch-ai{align-items:flex-start}
     .ch-bubble{max-width:85%;padding:10px 14px;border-radius:14px;font-size:.92rem;line-height:1.6;white-space:pre-wrap;word-break:break-word}
@@ -914,12 +920,13 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime,
     moreEl.addEventListener('click',()=>{shown+=PAGE;render();});
     // ----- 상단 섹션 전환 (캘린더 / 연구 / 종합분석) -----
     const sectionsEl=document.getElementById('sections');
-    const SECS=[['calendar','캘린더'],['research','연구'],['synthesis','종합분석']];
-    let calInited=false;
+    const SECS=[['home','홈'],['calendar','캘린더'],['research','연구'],['synthesis','종합분석']];
+    let calInited=false, homeInited=false;
     function showSection(key){
       sectionsEl.querySelectorAll('.secbtn').forEach(x=>x.classList.toggle('active',x.dataset.s===key));
       SECS.forEach(([k])=>{const el=document.getElementById('sec-'+k); if(el) el.style.display=(k===key?'block':'none');});
       if(key==='calendar' && !calInited){calInited=true; initCalendar();}
+      if(key==='home' && !homeInited){homeInited=true; initChat();}
     }
     function buildSections(){
       sectionsEl.innerHTML=SECS.map(([k,label],i)=>
@@ -1106,19 +1113,21 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime,
         L.innerHTML=monthEvs.length? monthEvs.map(e=>eventRow(e,true)).join('') : '<p class="muted">이 달 일정이 없습니다.</p>';
       }
     }
-    // ----- 질문하기 (자료 근거 RAG 챗봇) -----
+    // ----- 홈 코파일럿 (자료+일정 근거 RAG) -----
     const CHAT_MODEL="claude-haiku-4-5-20251001";
-    let chatInited=false, chatKey="", chatCorpus=null, chatBusy=false;
-    const CHAT_SYSTEM="당신은 발달지연 아동(Sotos 증후군) 보호자를 돕는 보조자입니다. 아래 '근거 자료'에 적힌 내용에만 기반해 한국어로 쉽게 답하세요. "
-      +"규칙: (1) 자료에 없는 내용은 지어내지 말고 '모은 자료에서는 확인되지 않습니다'라고 답합니다. "
-      +"(2) 진단·치료·복용 등 의학적 권고는 하지 않습니다. 정보 정리까지만 하고, 판단은 담당 의료진과 상의하도록 안내합니다. "
-      +"(3) 근거로 쓴 자료는 문장 끝에 [번호]로 표시합니다. (4) 과장 없이 확실한 것과 연구 중인 것을 구분합니다.";
+    let chatKey="", chatCorpus=null, chatBusy=false, calCache=null;
+    const CHAT_SYSTEM="당신은 발달지연 아동(Sotos 증후군)을 돌보는 두 보호자를 돕는 '케어 코파일럿'입니다. "
+      +"아래에 주어진 '등록된 일정'과 '근거 자료'에 기반해 한국어로 쉽고 따뜻하게 답하세요. "
+      +"규칙: (1) 일정 질문엔 등록된 일정만 사용하고, 의학·연구 질문엔 근거 자료만 사용합니다. 자료에 없으면 '모은 자료에서는 확인되지 않습니다'라고 답합니다. "
+      +"(2) 진단·치료·복용 등 의학적 권고는 하지 않습니다. 정보 정리·정리된 제안까지만 하고, 판단은 담당 의료진과 상의하도록 안내합니다. "
+      +"(3) 연구 자료를 인용하면 문장 끝에 [번호]로 표시합니다. (4) 과장 없이 확실한 것과 연구 중인 것을 구분합니다. "
+      +"(5) 도움이 되면 '다음 할 일'을 1~3개 부드럽게 제안할 수 있습니다(일정 잡기·의료진에게 물어볼 점 등).";
     function initChat(){
       const setup=calEl('chat-setup'), login=calEl('chat-login'), app=calEl('chat-app');
       if(!ensureFirebase()){ setup.style.display='block'; login.style.display='none'; app.style.display='none'; return; }
       setup.style.display='none';
       onAuth(u=>{
-        if(u){ login.style.display='none'; app.style.display='block'; loadChatKey(); subscribeChat(); }
+        if(u){ login.style.display='none'; app.style.display='block'; loadChatKey(); subscribeChat(); renderUpcoming(); }
         else { login.style.display='block'; app.style.display='none'; }
       });
       calEl('chat-login-btn').onclick=()=>fbLogin('chat-email','chat-pw','chat-err');
@@ -1128,6 +1137,24 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime,
       calEl('chat-key-edit').onclick=()=>{calEl('chat-key-box').style.display='flex';};
       calEl('chat-send').onclick=sendChat;
       calEl('chat-input').addEventListener('keydown',e=>{ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); sendChat(); }});
+    }
+    function upcomingEvents(days){
+      const out=[]; const today=new Date(); today.setHours(0,0,0,0);
+      const lim=new Date(today); lim.setDate(lim.getDate()+(days||14));
+      Object.keys(calCache||{}).forEach(id=>{ const e=calCache[id]; if(!e||!e.date) return;
+        const d=new Date(e.date+'T00:00:00'); if(d>=today && d<=lim) out.push({id,...e}); });
+      return out.sort((a,b)=>(a.date+'T'+(a.time||'')).localeCompare(b.date+'T'+(b.time||'')));
+    }
+    function renderUpcoming(){
+      const el=calEl('home-upcoming'); if(!el) return;
+      fbDB.ref('calendar/events').once('value').then(s=>{
+        calCache=s.val()||{};
+        const evs=upcomingEvents(7);
+        const DOWk=['일','월','화','수','목','금','토'];
+        const rows=evs.slice(0,8).map(e=>{ const d=new Date(e.date+'T00:00:00');
+          return `<span class="up-chip"><i style="background:${CATCOLOR[e.cat]||'#8a8f99'}"></i>${d.getMonth()+1}/${d.getDate()}(${DOWk[d.getDay()]}) ${e.time?esc(e.time)+' ':''}${esc(e.title)}</span>`; }).join('');
+        el.innerHTML = `<div class="up-h">다가오는 7일 일정</div>`+(rows||'<span class="muted">예정된 일정이 없습니다.</span>');
+      }).catch(()=>{ el.innerHTML=''; });
     }
     function loadChatKey(){
       fbDB.ref('secure/anthropicKey').once('value').then(s=>{
@@ -1189,7 +1216,12 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime,
         const corpus=await loadCorpus();
         const hits=retrieve(q, corpus, 12);
         const srcList=hits.map((h,i)=>`[${i+1}] (${h.kind==='resource'?'국내자료':h.source}) ${h.title}\\n${h.text.slice(0,500)}`).join('\\n\\n');
-        const user=`질문: ${q}\\n\\n근거 자료:\\n${srcList||'(관련 자료를 찾지 못했습니다)'}`;
+        // 일정 컨텍스트 (최신값 확보)
+        try{ const cs=await fbDB.ref('calendar/events').once('value'); calCache=cs.val()||{}; }catch(e){}
+        const DOWs=['일','월','화','수','목','금','토'];
+        const sched=upcomingEvents(14).map(e=>{ const d=new Date(e.date+'T00:00:00');
+          return `${d.getMonth()+1}/${d.getDate()}(${DOWs[d.getDay()]}) ${e.time||''} [${e.cat||''}] ${e.title}${e.memo?' ('+e.memo+')':''}`; }).join('\\n');
+        const user=`질문: ${q}\\n\\n등록된 일정(앞으로 2주):\\n${sched||'(없음)'}\\n\\n근거 자료:\\n${srcList||'(관련 자료를 찾지 못했습니다)'}`;
         const resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',
           headers:{'Content-Type':'application/json','x-api-key':chatKey,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
           body:JSON.stringify({model:CHAT_MODEL,max_tokens:1024,system:CHAT_SYSTEM,messages:[{role:'user',content:user}]})});
@@ -1205,16 +1237,7 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime,
     buildDomains();
     buildAxis();
     applyDomainView();
-    showSection('calendar');
-    // 플로팅 질문하기 버튼
-    let chatOpen=false;
-    function toggleChat(){
-      chatOpen=!chatOpen;
-      calEl('chat-panel').style.display=chatOpen?'flex':'none';
-      if(chatOpen && !chatInited){chatInited=true; initChat();}
-    }
-    calEl('chat-fab').onclick=toggleChat;
-    calEl('chat-close').onclick=()=>{chatOpen=false; calEl('chat-panel').style.display='none';};
+    showSection('home');
     """
     js = (js.replace("__DATA__", data_json)
             .replace("__DOMAINS__", json.dumps(DOMAIN_LABELS, ensure_ascii=False))
@@ -1263,13 +1286,10 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime,
         "<div id='cal-grid' class='cal-grid'></div>"
         "<div id='cal-list-h' class='cal-agenda-h'></div><div id='cal-list' class='cal-agenda'></div></div>"
         "</div>"
-        # ===== 질문하기 (좌측 하단 플로팅) =====
-        "<button id='chat-fab' class='chat-fab' aria-label='질문하기' title='질문하기'>💬</button>"
-        "<div id='chat-panel' class='chat-panel' style='display:none'>"
-        "<div class='chat-panel-head'><b>질문하기</b><button id='chat-close' class='chat-close' aria-label='닫기'>×</button></div>"
-        "<div class='chat-body'>"
+        # ===== 홈 (코파일럿) =====
+        "<div id='sec-home'>"
         "<div id='chat-setup' style='display:none' class='cal-setup'>"
-        "<b>질문하기를 쓰려면 Firebase 설정이 필요합니다.</b> 캘린더와 동일한 설정을 사용합니다.</div>"
+        "<b>코파일럿을 쓰려면 Firebase 설정이 필요합니다.</b> 캘린더와 동일한 설정을 사용합니다.</div>"
         "<div id='chat-login' style='display:none' class='cal-login'>"
         "<h3>로그인</h3><p class='muted'>두 분만 사용할 수 있습니다.</p>"
         "<input id='chat-email' type='email' placeholder='이메일' autocomplete='username'>"
@@ -1277,19 +1297,22 @@ def render_dashboard(all_items: list, synth: dict | None, run_time: dt.datetime,
         "<button id='chat-login-btn' class='cal-btn'>로그인</button>"
         "<div id='chat-err' class='cal-err'></div></div>"
         "<div id='chat-app' style='display:none'>"
-        "<div class='cal-bar'><span id='chat-key-status' class='muted'></span>"
+        "<div class='home-hero'><div><div class='home-title'>서아 케어 코파일럿</div>"
+        "<div class='muted' style='font-size:.84rem'>이번 주 일정과 모은 자료를 바탕으로 도와드립니다.</div></div>"
         "<span><button id='chat-key-edit' class='cal-link' style='display:none'>키 변경</button> "
         "<button id='chat-logout' class='cal-link'>로그아웃</button></span></div>"
+        "<div id='chat-key-status' class='muted' style='font-size:.8rem;margin:2px 0'></div>"
         "<div id='chat-key-box' style='display:none' class='chat-keybox'>"
         "<input id='chat-key-input' type='password' placeholder='Anthropic API 키 (sk-ant-...)'>"
         "<button id='chat-key-save' class='cal-btn'>키 저장</button>"
         "<p class='muted' style='font-size:.78rem;margin:6px 0 0'>키는 Firebase에 저장되어 로그인한 두 분만 사용합니다. Anthropic 콘솔에서 월 사용 한도를 걸어두길 권합니다.</p></div>"
+        "<div id='home-upcoming' class='home-upcoming'></div>"
         "<div id='chat-log' class='chat-log'></div>"
         "<div class='chat-inputbar'>"
-        "<textarea id='chat-input' rows='2' placeholder='질문 (예: 소토스 아동의 성장에 대해 알려줘)'></textarea>"
+        "<textarea id='chat-input' rows='2' placeholder='코파일럿에게 질문 (예: 이번 주 일정 알려줘 / 소토스 성장 관련 자료 정리해줘)'></textarea>"
         "<button id='chat-send' class='cal-btn'>보내기</button></div>"
-        "<p class='muted' style='font-size:.74rem;margin-top:6px'>답변은 모은 자료(논문·임상·국내자료)에 근거합니다. 의학적 판단은 담당 의료진과 상의하세요.</p>"
-        "</div></div></div>"
+        "<p class='muted' style='font-size:.74rem;margin-top:6px'>답변은 모은 자료(논문·임상·국내자료)와 등록된 일정에 근거합니다. 의학적 판단은 담당 의료진과 상의하세요.</p>"
+        "</div></div>"
         # ===== 연구 (영역 병렬: Sotos / 발달치료 / 국내 실용자료) =====
         "<div id='sec-research' style='display:none'>"
         "<div class='domains' id='domains'></div>"
